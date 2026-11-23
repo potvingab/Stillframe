@@ -1,6 +1,6 @@
 # Stillframe
 
-Stillframe is a native macOS photo browser by **Gabriel Potvin**. Point it at folders you already use, browse your photographs at full window size, and press a letter to add a keeper to a collection. The same frame can be a favorite, the opening shot of a travel post, and a candidate for a print. It stays in its original folder.
+Stillframe is a native macOS photo browser. Point it at folders you already use, browse your photographs at full window size, and press a letter to add a keeper to a collection. The same frame can be a favorite, the opening shot of a travel post, and a candidate for a print. It stays in its original folder.
 
 **[Download Stillframe for macOS](https://github.com/potvingab/Stillframe/releases/latest)** · macOS 14 or later · Apple silicon and Intel
 
@@ -73,5 +73,3 @@ The script builds for the current Mac, assembles the app bundle, signs it locall
 ```sh
 swift test --disable-sandbox -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 ```
-
-App and photographs by **Gabriel Potvin**. The welcome screen and stacked-print app icon use the mountain photograph `DSCF6497.JPG` shown above.
