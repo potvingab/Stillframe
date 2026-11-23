@@ -1,74 +1,91 @@
 # Stillframe
 
-Stillframe is a native macOS photo browser. Point it at folders you already use, browse your photographs at full window size, and press a letter to add a keeper to a collection. The same frame can be a favorite, the opening shot of a travel post, and a candidate for a print. It stays in its original folder.
+**A simple, native photo browser for macOS.**
+
+Browse photographs directly from the folders on your Mac. Move through a shoot with the arrow keys and press a letter to mark a keeper. One photo can belong to *Favorites*, *Instagram Post 1*, and *Print Shortlist* while the original stays in its folder.
 
 **[Download Stillframe for macOS](https://github.com/potvingab/Stillframe/releases/latest)** · macOS 14 or later · Apple silicon and Intel
 
-![Stillframe showing a mountain photograph from Desktop, the Fujifilm capture settings, and a filmstrip of travel photos](docs/screenshots/pictures.png)
+![A mountain photograph open in Stillframe, with camera settings on the right and a filmstrip below](docs/screenshots/pictures.png)
 
 ## Getting started
 
-Download the Mac ZIP from the release page, unzip it, and move **Stillframe.app** to Applications. The downloadable build is ad-hoc signed and has no Apple notarization. You can also [build it locally](#build-from-source).
+Download the macOS ZIP, unzip it, and move **Stillframe.app** to Applications. The downloadable app is ad-hoc signed and has no Apple notarization. You can also [build it from source](#build-from-source).
 
-1. Choose **Add Folders…** in the welcome walkthrough, or drag folders from Finder into **Pictures**. The example below includes **Desktop** and **Downloads**. Keeping **Include subfolders** checked also brings in shoots filed under Desktop, such as the Bath photographs.
-2. Use **←** and **→** to browse. When you find a keeper, choose **Add to Collection → New Collection…**. Name it *Favorites*, pick a color, and assign **F**.
-3. Continue through the filmstrip. Press **F** to add or remove the current picture. Open **Collections → Favorites** to see your picks together.
+1. **Add your folders.** Choose **Add Folders…** in the welcome walkthrough, or drag folders from Finder into **Pictures**. Turn on **Include subfolders** to see the shoots inside them.
+2. **Browse your photos.** Press **←** or **→** to move through the filmstrip. Pinch to inspect a detail or open the info sidebar to see how the shot was taken.
+3. **Mark your first favorite.** Choose **Add to Collection → New Collection…**, name it *Favorites*, pick a color, and assign **F**. Click **Create and Add** to include the current photo.
+4. **Review your favorites.** Press **F** on another photo to add it. Press it again to remove the mark. Open **Collections → Favorites** to see your picks together.
 
-<img src="docs/screenshots/folders.png" alt="The Folders sheet with Desktop and Downloads selected and Include subfolders enabled for both" width="500">
+<img src="docs/screenshots/folders.png" alt="Desktop and Downloads selected as sources, both with Include subfolders enabled" width="500">
 
-You can skip the three-step walkthrough with **Esc** and revisit it under **Help → Stillframe Walkthrough…**.
+Press **Esc** to skip the walkthrough. You can reopen it under **Help → Stillframe Walkthrough…**.
 
-## Collections in practice
+## Organize with collections
 
-![Eight collections of travel photographs, including pinned Favorites and Instagram Post 1, Memories from Bath, Needs Editing, and Print Shortlist](docs/screenshots/collections.png)
+Create collections for a trip, an editing queue, or a set of prints. Give each one a color and an optional shortcut letter. The colored stripes beneath a thumbnail show all the collections that photo belongs to.
 
-### Sequence a travel post
+![Eight photo collections, including pinned Favorites and Instagram Post 1 alongside Memories from Bath and Needs Editing](docs/screenshots/collections.png)
 
-Create *Instagram Post 1* and assign **I**. Mark an establishing shot first, then a few details that tell the story. In this six-frame example, the harbor sets the scene, the middle frames move from the beach into town, and two cats close the sequence. Use **Sort → Date added to collection → Oldest first** to review the shots in the order you picked them. Choose **Select → Select All → Copy to…** to gather the originals in an upload folder. Choose their final order when composing the post.
+### Plan an Instagram post
 
-![Six photographs selected in Instagram Post 1, with Share and Copy to available beneath the grid](docs/screenshots/instagram.png)
+Create *Instagram Post 1* and assign **I**. Mark the photos in the order you want to tell the story. The six-photo sequence below opens at the harbor, follows the beach into town, and ends with two cats.
 
-### Cull a shoot and queue edits
+To review the sequence, open **Sort**, choose **Date added to collection**, and select **Oldest first**. Choose **Select → Select All → Copy to…** to gather the originals in an upload folder. Set their final order when composing the post.
 
-Filter to a shoot date or camera and turn off **Group by folder** to review frames from several cards together. Zoom in to check focus, then press **E** to mark promising frames for *Needs Editing*. Keep the queue pinned. Double-click a filmstrip thumbnail to open its original in the Mac’s default app for that file type. When a frame is finished, press **E** again to clear it from the queue. A separate *Portfolio Selects* mark can stay on the same photograph.
+![Six travel photos selected for Instagram Post 1, with Share and Copy to in the footer](docs/screenshots/instagram.png)
 
-### Gather memories across folders
+### Review a shoot for editing
 
-Make a *Memories from Bath* collection for the bridge, street scenes, and small details you want to remember together. Use a capture-date range to find the trip, then mark photos from any of its folders. Months later, those pictures are still in the collection when you switch to a different workspace. Select a few and choose **Share…**, or use **… → Send by Email…** to compose a message with the files attached.
+Assign **E** to *Needs Editing* and pin the collection. Filter by shoot date or camera, zoom in to check focus, and press **E** on frames you want to edit.
+
+Double-click a filmstrip thumbnail to open the original in your Mac’s default app for that file type. Back in Stillframe, press **E** again to clear a finished frame from the queue. Its *Portfolio Selects* mark can stay.
+
+### Gather trip photos from different folders
+
+Filter to the dates of your Bath trip, then mark the bridge, street scenes, and small details for *Memories from Bath*. You can gather pictures from several folders and return to them from any workspace. To send a few favorites, select them and choose **Share…** or **… → Send by Email…**.
 
 ### Choose photographs to print
 
-Mark candidates for *Print Shortlist* as you come across them in other collections. Open the shortlist, check the pixel dimensions in the info sidebar, and zoom in to compare detail. Select the final frames and drag them to a print-order folder in Finder. **Favorites** can keep the wider selection while the print folder holds just the files you intend to send.
+Assign **P** to *Print Shortlist* and mark candidates as you browse. Open the collection to check pixel dimensions in the info sidebar and zoom in to compare detail. Drag the final selection into a Finder folder for the print shop.
 
-## Feature guide
+## Features
 
-| In the app | What you can do |
-| --- | --- |
-| **Pictures** | Click a thumbnail, use the arrow keys or the on-screen arrows, or drag the filmstrip scrollbar to travel through a large folder. Use the zoom buttons or pinch to magnify, pan across the image, and choose **Reset zoom** to fit it again. Previews load on demand using the image formats supported by macOS Image I/O. |
-| **Photo info** | Toggle the sidebar below the preview. See the file’s path, dimensions, format, size, and filesystem dates. **Show in Finder** reveals the original. When the camera recorded them, the sidebar also shows capture time, camera, lens, aperture, exposure, ISO, and focal length. Expand the embedded metadata groups for details such as EXIF, TIFF, IPTC, or XMP. |
-| **Folders and workspaces** | Press **⌘O** to add folders or **⌘R** to refresh. Set subfolder inclusion per source. In **Folders → Workspaces**, create a separate folder list for each project, duplicate a list with its settings, rename it, or delete it. Switch lists in the sheet or using the arrow beside **Folders**. All workspaces share your collections. |
-| **Filter** | Combine source folders, part of a filename, format, capture day or inclusive date range, camera, and lens. Pictures remembers filters separately for each workspace during the session. Each open collection has its own filter too. |
-| **Sort** | Order by filename, capture date, or modification date in either direction. Collections also support the order in which you added pictures. **Group by folder** keeps containing folders together alphabetically and applies the chosen order inside each. Missing dates sort last. Pictures and each collection retain their sort settings between launches. |
-| **Picture statistics** | Click the picture counter to compare the count and total size of matching photos with the full set, including a folder breakdown. A file in overlapping sources counts once under the most specific source. |
-| **Collection marks** | Create a collection from the toolbar or while viewing a photo. Choose a preset or custom color and an optional shortcut letter. The letter toggles membership in either carousel. Colored stripes under thumbnails show overlapping memberships. Use **In Collections** to see or change every mark on the current picture. |
-| **Collection management** | Click a collection to open its grid, then click a picture to view it. Use a collection’s **…** menu or right-click its cover to edit its name, color, or shortcut, pin it, or delete it. Pinned collections appear first in the overview and marking menu. Select two or more covers and choose **Merge** to replace them with one collection. Shared photos appear once and a merged collection keeps its pin if any source was pinned. |
-| **Selection and delivery** | In either grid, use **Select**, **Select All**, or drag across cards. In a photo grid, drag selected files to Finder, choose **Share…** or **Copy to…**, compose an email, or remove the selection from the collection. Copying into a folder adds a numeric suffix if a filename already exists. **Done** ends selection mode. |
-| **Navigation** | Swipe horizontally with two fingers in the top toolbar to switch between Pictures and Collections. Inside a collection, **Esc** or a rightward two-finger swipe goes back one level. The interface follows the Mac’s light or dark appearance. |
+### Browse and inspect
 
-### Where the library lives
+- **Filmstrip and zoom.** Click a thumbnail or an on-screen arrow, or drag the filmstrip scrollbar to jump ahead. Use the zoom buttons or pinch, pan to inspect detail, then choose **Reset zoom**. Stillframe loads previews on demand using macOS Image I/O.
+- **Photo information.** The sidebar shows the file’s path, dimensions, format, size, and dates. When available, it also shows capture time, camera, lens, aperture, shutter speed, ISO, and focal length. Expand EXIF, TIFF, IPTC, or XMP for more detail, or choose **Show in Finder** to locate the original.
+- **Navigation.** Press **⌘1** for Pictures or **⌘2** for Collections, or swipe across the toolbar with two fingers. Inside a collection, press **Esc** or swipe right with two fingers to go back. The app follows your Mac’s light or dark appearance.
 
-Stillframe saves folder references, workspace lists, collection membership, colors, shortcuts, pins, and sort settings in `~/Library/Application Support/Stillframe/library.json`. Removing a source folder preserves its collection marks. Deleting a collection removes its marks and leaves the original images in place.
+### Folders, filters, and sorting
+
+- **Folders and workspaces.** Press **⌘O** to add folders and **⌘R** to refresh them. Use **Folders → Workspaces** to create, duplicate, rename, or delete project folder lists. Switch lists there or with the arrow beside **Folders**. All workspaces share your collections.
+- **Filter.** Combine source folders, part of a filename, file format, capture day or date range, camera, and lens. Each workspace and collection remembers its filters for the session.
+- **Sort.** Sort by filename, date taken, or date modified in either direction. Inside a collection, you can also sort by date added. **Group by folder** keeps folders together alphabetically. Missing dates sort last. Your order is saved between launches.
+- **Picture statistics.** Click the picture counter for counts and file sizes before and after filtering, with a breakdown by folder. Overlapping sources count each file once.
+
+### Manage and share selections
+
+- **Organize collections.** Use **In Collections** to change a photo’s marks. Right-click a cover or open its **…** menu to rename, recolor, pin, or delete a collection, or change its shortcut. Pinned collections appear first in the overview and the marking menu.
+- **Merge collections.** Select two or more covers and choose **Merge…**. The new collection replaces the selected collections and includes each photo once. It stays pinned if any of them were pinned.
+- **Select and share files.** In a collection grid, use **Select**, **Select All**, or drag across cards. Drag the selection to Finder, choose **Share…** or **Copy to…**, or open **…** to email the files or remove their collection marks. Copies get a numeric suffix if a filename already exists. Choose **Done** to finish.
+
+## Where your library lives
+
+Stillframe saves folder references, workspaces, collection marks, colors, shortcuts, pins, and sort settings in `~/Library/Application Support/Stillframe/library.json`. Removing a source folder preserves its collection marks. Deleting a collection leaves the original photographs in place.
 
 ## Build from source
 
-Use Xcode or Apple’s Command Line Tools with the macOS 26 SDK or later. From a checkout of this repository, run the following commands.
+Use Xcode or Apple’s Command Line Tools with the macOS 26 SDK or later. Run these commands from the repository folder.
 
 ```sh
 ./build.sh
 open Stillframe.app
 ```
 
-The script builds for the current Mac, assembles the app bundle, signs it locally, and verifies its signature. To run the Swift Testing suite, open `Package.swift` in Xcode and choose **Product → Test**. For the standalone Command Line Tools, use the bundled test plug-in.
+The script builds Stillframe for your Mac, signs the app bundle locally, and verifies its signature.
+
+To run the tests in Xcode, open `Package.swift` and choose **Product → Test**. With the standalone Command Line Tools, use the bundled Swift Testing plug-in.
 
 ```sh
 swift test --disable-sandbox -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
