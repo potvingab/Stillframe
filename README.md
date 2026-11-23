@@ -4,7 +4,7 @@ Stillframe is a native macOS photo browser. Point it at folders you already use,
 
 **[Download Stillframe for macOS](https://github.com/potvingab/Stillframe/releases/latest)** · macOS 14 or later · Apple silicon and Intel
 
-![Stillframe showing a mountain photograph from Desktop, the Fujifilm capture settings, and a filmstrip of travel photos](docs/screenshots/pictures.jpg)
+![Stillframe showing a mountain photograph from Desktop, the Fujifilm capture settings, and a filmstrip of travel photos](docs/screenshots/pictures.png)
 
 ## Getting started
 
@@ -14,19 +14,19 @@ Download the Mac ZIP from the release page, unzip it, and move **Stillframe.app*
 2. Use **←** and **→** to browse. When you find a keeper, choose **Add to Collection → New Collection…**. Name it *Favorites*, pick a color, and assign **F**.
 3. Continue through the filmstrip. Press **F** to add or remove the current picture. Open **Collections → Favorites** to see your picks together.
 
-<img src="docs/screenshots/folders.jpg" alt="The Folders sheet with Desktop and Downloads selected and Include subfolders enabled for both" width="500">
+<img src="docs/screenshots/folders.png" alt="The Folders sheet with Desktop and Downloads selected and Include subfolders enabled for both" width="500">
 
 You can skip the three-step walkthrough with **Esc** and revisit it under **Help → Stillframe Walkthrough…**.
 
 ## Collections in practice
 
-![Eight collections of travel photographs, including pinned Favorites and Instagram Post 1, Memories from Bath, Needs Editing, and Print Shortlist](docs/screenshots/collections.jpg)
+![Eight collections of travel photographs, including pinned Favorites and Instagram Post 1, Memories from Bath, Needs Editing, and Print Shortlist](docs/screenshots/collections.png)
 
 ### Sequence a travel post
 
 Create *Instagram Post 1* and assign **I**. Mark an establishing shot first, then a few details that tell the story. In this six-frame example, the harbor sets the scene, the middle frames move from the beach into town, and two cats close the sequence. Use **Sort → Date added to collection → Oldest first** to review the shots in the order you picked them. Choose **Select → Select All → Copy to…** to gather the originals in an upload folder. Choose their final order when composing the post.
 
-![Six photographs selected in Instagram Post 1, with Share and Copy to available beneath the grid](docs/screenshots/instagram.jpg)
+![Six photographs selected in Instagram Post 1, with Share and Copy to available beneath the grid](docs/screenshots/instagram.png)
 
 ### Cull a shoot and queue edits
 
