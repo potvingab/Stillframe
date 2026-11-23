@@ -2,11 +2,13 @@
 
 Stillframe is a native macOS photo browser by **Gabriel Potvin**. Point it at folders you already use, browse your photographs at full window size, and press a letter to add a keeper to a collection. The same frame can be a favorite, the opening shot of a travel post, and a candidate for a print. It stays in its original folder.
 
+**[Download Stillframe for macOS](https://github.com/potvingab/Stillframe/releases/latest)** · macOS 14 or later · Apple silicon and Intel
+
 ![Stillframe showing a mountain photograph from Desktop, the Fujifilm capture settings, and a filmstrip of travel photos](docs/screenshots/pictures.jpg)
 
 ## Getting started
 
-[Build Stillframe for your Mac](#build-from-source), then open **Stillframe.app**. It runs on macOS 14 Sonoma or later.
+Download the Mac ZIP from the release page, unzip it, and move **Stillframe.app** to Applications. The downloadable build is ad-hoc signed and has no Apple notarization. You can also [build it locally](#build-from-source).
 
 1. Choose **Add Folders…** in the welcome walkthrough, or drag folders from Finder into **Pictures**. The example below includes **Desktop** and **Downloads**. Keeping **Include subfolders** checked also brings in shoots filed under Desktop, such as the Bath photographs.
 2. Use **←** and **→** to browse. When you find a keeper, choose **Add to Collection → New Collection…**. Name it *Favorites*, pick a color, and assign **F**.
