@@ -9,7 +9,7 @@ app="$staging/Stillframe.app"
 contents="$app/Contents"
 mkdir -p "$contents/MacOS" "$contents/Resources"
 cp "$bin_dir/Stillframe" "$contents/MacOS/"
-cp Sources/Stillframe/Resources/Welcome.jpg "$contents/Resources/"
+cp LICENSE Sources/Stillframe/Resources/Welcome.jpg "$contents/Resources/"
 cp Packaging/Info.plist "$contents/Info.plist"
 
 # Give changed artwork a new resource name in the system icon cache.

@@ -73,3 +73,7 @@ The script builds for the current Mac, assembles the app bundle, signs it locall
 ```sh
 swift test --disable-sandbox -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 ```
+
+## License
+
+The [MIT License](LICENSE) covers the source code and documentation text. All rights are reserved for the photographs, screenshots, and photo-based app icon.
