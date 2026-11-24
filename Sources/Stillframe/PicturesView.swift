@@ -31,12 +31,13 @@ struct PicturesView: View {
                 }
             } else {
                 let groups = SourceGroups(library.state.folders)
-                FilteredPhotos(source: library.photos, groups: groups, filter: filter) { visible in
+                FilteredPhotos(source: library.photos, filter: filter) { visible in
                     if visible.isEmpty {
                         NoFilterMatches(filter: $filter, all: library.photos, groups: groups)
                     } else {
                         SortedPhotos(source: visible, sourceOrder: .pictures, order: library.picturesSort) { photos in
                             PhotoCarousel(photos: photos, selectedPath: $selectedPath, all: library.photos, groups: groups)
+                                .modifier(PictureMapAccess(photos: photos, open: { selectedPath = $0.id }))
                         }
                     }
                 }

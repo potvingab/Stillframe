@@ -54,21 +54,23 @@ Assign **P** to *Print Shortlist* and mark candidates as you browse. Open the co
 ### Browse and inspect
 
 - **Filmstrip and zoom.** Click a thumbnail or an on-screen arrow, or drag the filmstrip scrollbar to jump ahead. Use the zoom buttons or pinch, pan to inspect detail, then choose **Reset zoom**. Stillframe loads previews on demand using macOS Image I/O.
-- **Photo information.** The sidebar shows the file’s path, dimensions, format, size, and dates. When available, it also shows capture time, camera, lens, aperture, shutter speed, ISO, and focal length. Expand EXIF, TIFF, IPTC, or XMP for more detail, or choose **Show in Finder** to locate the original.
-- **Navigation.** Press **⌘1** for Pictures or **⌘2** for Collections, or swipe across the toolbar with two fingers. Inside a collection, press **Esc** or swipe right with two fingers to go back. The app follows your Mac’s light or dark appearance.
+- **Photo information.** The sidebar shows the file’s path, dimensions, format, size, and dates. When available, it also shows capture time, camera, lens, aperture, shutter speed, ISO, and focal length. Geotagged pictures show their coordinates and a map pin. Choose **Open in Apple Maps** to explore the location. Expand EXIF, TIFF, IPTC, or XMP for more detail, or choose **Show in Finder** to locate the original.
+- **Navigation.** Press **⌘1** for Pictures or **⌘2** for Collections, or swipe across the toolbar with two fingers. Click the current picture number, type a position, and press **Return** to jump within the current sort and filter order. In a collection grid, swipe right to return to the overview. In a picture preview, scroll the filmstrip with two fingers and press **Esc** to return to the grid. The app follows your Mac’s light or dark appearance.
 
 ### Folders, filters, and sorting
 
+Choose **Map** in Pictures or an open collection to see the locations of the pictures matching your filters. Select a pin to see the pictures taken there, then click a thumbnail to open it. Nearby pins group together as you zoom out.
+
 - **Folders and workspaces.** Press **⌘O** to add folders and **⌘R** to refresh them. Use **Folders → Workspaces** to create, duplicate, rename, or delete project folder lists. Switch lists there or with the arrow beside **Folders**. All workspaces share your collections.
-- **Filter.** Combine source folders, part of a filename, file format, capture day or date range, camera, and lens. Each workspace and collection remembers its filters for the session.
+- **Filter.** Combine source folders, part of a filename, file format, capture day or date range, camera, and lens. The folder filter lists subfolders found by recursive scans. Choose **Deselect All**, then check a folder to see just that branch. Each workspace and collection remembers its filters for the session.
 - **Sort.** Sort by filename, date taken, or date modified in either direction. Inside a collection, you can also sort by date added. **Group by folder** keeps folders together alphabetically. Missing dates sort last. Your order is saved between launches.
-- **Picture statistics.** Click the picture counter for counts and file sizes before and after filtering, with a breakdown by folder. Overlapping sources count each file once.
+- **Picture statistics.** Click the total on the right of the picture counter for counts and file sizes before and after filtering, with a breakdown by folder. Overlapping sources count each file once.
 
 ### Manage and share selections
 
-- **Organize collections.** Use **In Collections** to change a photo’s marks. Right-click a cover or open its **…** menu to rename, recolor, pin, or delete a collection, or change its shortcut. Pinned collections appear first in the overview and the marking menu.
+- **Organize collections.** Use **In Collections** to change a photo’s marks. Right-click a cover or open its **…** menu to rename, recolor, pin, or delete a collection, or change its shortcut. Use **Select** to pin or unpin several covers at once. Pinned collections appear first in the overview and the marking menu.
 - **Merge collections.** Select two or more covers and choose **Merge…**. The new collection replaces the selected collections and includes each photo once. It stays pinned if any of them were pinned.
-- **Select and share files.** In a collection grid, use **Select**, **Select All**, or drag across cards. Drag the selection to Finder, choose **Share…** or **Copy to…**, or open **…** to email the files or remove their collection marks. Copies get a numeric suffix if a filename already exists. Choose **Done** to finish.
+- **Select and share files.** Use the **…** next to a picture or right-click it to share, copy, or email its original file. In a collection, the same menu can remove its mark. For multiple pictures in a collection grid, use **Select**, **Select All**, or drag across cards. Drag the selection to Finder, choose **Share…** or **Copy to…**, or open **…** to email the files or remove their collection marks. Copies get a numeric suffix if a filename already exists. Choose **Done** to finish.
 
 ## Where your library lives
 

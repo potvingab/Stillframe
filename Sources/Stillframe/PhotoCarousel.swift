@@ -9,8 +9,11 @@ struct PhotoCarousel: View {
     let all: PhotoList
     var groups = SourceGroups([])
     var accent = Palette.accent
+    var collectionID: UUID?
     @ViewState private var marking = false
     @ViewState private var creatingFor: Photo?
+    @ViewState private var positionDraft: String?
+    @FocusState private var editingPosition: Bool
 
     private var index: Int { photos.position(of: selectedPath) ?? 0 }
 
@@ -20,7 +23,7 @@ struct PhotoCarousel: View {
             VStack(spacing: 7) {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        preview(photo)
+                        preview(photo).contextMenu { pictureActions(photo) }
                         controls(photo)
                     }
                     HStack(spacing: 0) {
@@ -36,12 +39,13 @@ struct PhotoCarousel: View {
                 }.animation(reduceMotion ? nil : .smooth(duration: 0.28), value: showInspector)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.line))
-                Filmstrip(photos: photos, selected: index, library: library, accent: accent, onSelect: { selectedPath = $0 }, onOpen: openOriginal)
+                Filmstrip(photos: photos, selected: index, library: library, accent: accent, collectionID: collectionID,
+                          onSelect: { selectedPath = $0 }, onOpen: openOriginal)
                     .frame(height: FilmstripLayout.tile.height)
             }
             .background {
                 CarouselKeys { event in
-                    guard !marking, creatingFor == nil else { return false }
+                    guard !marking, creatingFor == nil, positionDraft == nil else { return false }
                     if event.keyCode == 123 || event.keyCode == 124 {
                         step(event.keyCode == 123 ? -1 : 1)
                         return true
@@ -59,6 +63,7 @@ struct PhotoCarousel: View {
                 if photos.position(of: selectedPath) == nil { selectedPath = photos.first?.id }
             }
             .onChange(of: photos) { old, new in
+                positionDraft = nil
                 guard !new.isEmpty, new.position(of: selectedPath) == nil else { return }
                 let previousIndex = old.position(of: selectedPath) ?? 0
                 selectedPath = new[min(previousIndex, new.count - 1)].id
@@ -104,6 +109,7 @@ struct PhotoCarousel: View {
             }
             Spacer(minLength: 0)
             if !showInspector { position }
+            OptionsMenu(title: "Picture actions") { pictureActions(photo) }
             Button { marking.toggle() } label: {
                 Label(memberships.isEmpty ? "Add to Collection" : "In Collections",
                       systemImage: memberships.isEmpty ? "bookmark" : "bookmark.fill")
@@ -127,8 +133,39 @@ struct PhotoCarousel: View {
             .frame(height: 42).background(Palette.surface)
     }
 
+    private func pictureActions(_ photo: Photo) -> PictureMenuItems {
+        PictureMenuItems(url: photo.url, library: library, collectionID: collectionID)
+    }
+
     private var position: some View {
-        StatisticsButton(label: "\(index + 1) / \(photos.count)", all: all, visible: photos, groups: groups)
+        HStack(spacing: 0) {
+            if positionDraft != nil {
+                TextField("Picture number", text: Binding(get: { positionDraft ?? "" }, set: { positionDraft = $0 }))
+                    .textFieldStyle(.roundedBorder).controlSize(.small).multilineTextAlignment(.trailing)
+                    .frame(width: max(34, CGFloat(String(photos.count).count * 8 + 12)))
+                    .focused($editingPosition)
+                    .onAppear { editingPosition = true }
+                    .onSubmit {
+                        guard let draft = positionDraft, let number = Int(draft.trimmingCharacters(in: .whitespaces)),
+                              (1...photos.count).contains(number) else {
+                            NSSound.beep()
+                            editingPosition = true
+                            return
+                        }
+                        selectedPath = photos[number - 1].id
+                        positionDraft = nil
+                    }
+                    .onExitCommand { positionDraft = nil }
+                    .help("Enter a picture number from 1 to \(photos.count) and press Return")
+                    .onChange(of: editingPosition) { _, focused in if !focused { positionDraft = nil } }
+            } else {
+                Button { positionDraft = String(index + 1) } label: {
+                    Text(String(index + 1)).padding(.horizontal, 4).frame(minHeight: 28).contentShape(Rectangle())
+                }.buttonStyle(.plain).help("Go to picture number")
+                    .accessibilityLabel("Go to picture number").accessibilityValue(String(index + 1))
+            }
+            StatisticsButton(label: "/ \(photos.count)", all: all, visible: photos, groups: groups)
+        }.font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.secondary).fixedSize()
     }
 
     private func arrow(_ name: String, symbol: String, key: KeyEquivalent, action: @escaping () -> Void) -> some View {
@@ -137,7 +174,7 @@ struct PhotoCarousel: View {
                 .frame(width: 36, height: 36).foregroundStyle(.white)
                 .modifier(ViewerGlass())
                 .contentShape(.interaction, Circle())
-        }.buttonStyle(.plain).keyboardShortcut(key, modifiers: [])
+        }.buttonStyle(.plain).keyboardShortcut(positionDraft == nil ? KeyboardShortcut(key, modifiers: []) : nil)
             .accessibilityLabel(name).help(name)
     }
 

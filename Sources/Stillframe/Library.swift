@@ -250,6 +250,7 @@ final class Library: ObservableObject {
     @Published private(set) var photos = PhotoList([])
     @Published private(set) var issues: [UUID: String] = [:]
     @Published private(set) var scanning = false
+    @Published var copyingPictures = false
     @Published var message: String?
 
     private(set) var markRevision = 0
@@ -494,8 +495,16 @@ final class Library: ObservableObject {
     }
 
     func togglePin(_ id: UUID) {
-        guard let index = state.collections.firstIndex(where: { $0.id == id }) else { return }
-        change(reindexMarks: false) { $0.collections[index].isPinned.toggle() }
+        guard let collection = state.collections.first(where: { $0.id == id }) else { return }
+        setPinned(!collection.isPinned, for: [id])
+    }
+
+    func setPinned(_ pinned: Bool, for ids: Set<UUID>) {
+        change(reindexMarks: false) { state in
+            for index in state.collections.indices where ids.contains(state.collections[index].id) {
+                state.collections[index].isPinned = pinned
+            }
+        }
     }
 
     @discardableResult

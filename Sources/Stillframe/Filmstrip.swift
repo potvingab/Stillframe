@@ -187,6 +187,7 @@ struct Filmstrip: NSViewRepresentable {
     let selected: Int
     let library: Library
     var accent = Palette.accent
+    var collectionID: UUID?
     let onSelect: (String) -> Void
     let onOpen: (URL) -> Void
 
@@ -271,6 +272,7 @@ struct Filmstrip: NSViewRepresentable {
         private func configure(_ cell: FilmstripCell, at index: Int) {
             let photo = parent.photos[index]
             cell.configure(photo: photo, accent: parent.accent, marks: parent.library.collections(containing: photo.id),
+                           menuItems: PictureMenuItems(url: photo.url, library: parent.library, collectionID: parent.collectionID),
                            select: { [weak self] in self?.parent.onSelect(photo.id) },
                            open: { [weak self] in self?.parent.onOpen(photo.url) })
         }
@@ -294,19 +296,22 @@ private final class FilmstripCell: NSCollectionViewItem {
     private var photo: Photo?
     private var accent = Palette.accent
     private var marks: [PhotoCollection] = []
+    private var menuItems: PictureMenuItems?
     override var isSelected: Bool { didSet { if isSelected != oldValue { render() } } }
 
     override func loadView() {
-        let host = ThumbnailHost(rootView: FilmstripTile(photo: photo, marks: marks, selected: isSelected, accent: accent))
+        let host = ThumbnailHost(rootView: tile)
         host.setAccessibilityElement(true)
         host.setAccessibilityRole(.button)
         view = host
     }
 
-    func configure(photo: Photo, accent: Color, marks: [PhotoCollection], select: @escaping () -> Void, open: @escaping () -> Void) {
+    func configure(photo: Photo, accent: Color, marks: [PhotoCollection], menuItems: PictureMenuItems,
+                   select: @escaping () -> Void, open: @escaping () -> Void) {
         self.photo = photo
         self.accent = accent
         self.marks = marks
+        self.menuItems = menuItems
         render()
         (view as? ThumbnailHost)?.press = select
         view.setAccessibilityCustomActions([NSAccessibilityCustomAction(name: "Open in default app") { open(); return true }])
@@ -315,9 +320,13 @@ private final class FilmstripCell: NSCollectionViewItem {
         view.toolTip = ([photo.url.lastPathComponent] + marks.map(\.name)).joined(separator: "\n")
     }
 
+    private var tile: FilmstripTile {
+        FilmstripTile(photo: photo, marks: marks, selected: isSelected, accent: accent, menuItems: menuItems)
+    }
+
     private func render() {
         view.setAccessibilitySelected(isSelected)
-        (view as? ThumbnailHost)?.rootView = FilmstripTile(photo: photo, marks: marks, selected: isSelected, accent: accent)
+        (view as? ThumbnailHost)?.rootView = tile
     }
 }
 
@@ -336,6 +345,7 @@ private struct FilmstripTile: View {
     let marks: [PhotoCollection]
     let selected: Bool
     let accent: Color
+    let menuItems: PictureMenuItems?
     @ViewState private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -361,5 +371,6 @@ private struct FilmstripTile: View {
         .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(selected ? accent : .clear, lineWidth: 2) }
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
+        .contextMenu { menuItems }
     }
 }

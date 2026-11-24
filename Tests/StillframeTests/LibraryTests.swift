@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import MapKit
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
@@ -21,7 +22,7 @@ private struct Fixture {
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         for (url, orientation) in [(main, 1), (other, 6)] {
             let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
-            CGImageDestinationAddImage(destination, context.makeImage()!, [
+            var properties: [CFString: Any] = [
                 kCGImagePropertyOrientation: orientation,
                 kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFModel: "Fixture camera"],
                 kCGImagePropertyExifDictionary: [
@@ -31,7 +32,14 @@ private struct Fixture {
                     kCGImagePropertyExifFocalLength: 55
                 ],
                 kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCKeywords: ["Foothills", "Evening"]]
-            ] as CFDictionary)
+            ]
+            if url == other {
+                properties[kCGImagePropertyGPSDictionary] = [
+                    kCGImagePropertyGPSLatitude: 33.86, kCGImagePropertyGPSLatitudeRef: "S",
+                    kCGImagePropertyGPSLongitude: 151.21, kCGImagePropertyGPSLongitudeRef: "E"
+                ]
+            }
+            CGImageDestinationAddImage(destination, context.makeImage()!, properties as CFDictionary)
             #expect(CGImageDestinationFinalize(destination))
         }
         try Data().write(to: source.appendingPathComponent("notes.txt"))
@@ -277,6 +285,7 @@ private struct Fixture {
     defer { f.clean() }
     let covers = (0..<30).map { PhotoCollection(name: "Collection \($0)") }
     let photos = PhotoList(covers.map { Photo(url: f.root.appendingPathComponent($0.name), modified: nil) })
+    let library = Library(saveURL: f.save)
     for testingPhotos in [false, true] {
         var selectedPhotos: Set<String> = []
         var selectedCovers: Set<UUID> = []
@@ -284,7 +293,8 @@ private struct Fixture {
         func content(selecting: Bool) -> CollectionGrid {
             if testingPhotos {
                 return CollectionGrid(items: photos, selected: Binding(get: { selectedPhotos }, set: { selectedPhotos = $0 }),
-                                      selecting: selecting) { url in opened.append(photos.position(of: url.path)!) }
+                                      selecting: selecting, menuItems: { PictureMenuItems(url: $0, library: library, collectionID: covers[0].id) },
+                                      open: { url in opened.append(photos.position(of: url.path)!) })
             }
             return CollectionGrid(collections: covers, choices: Binding(get: { selectedCovers }, set: { selectedCovers = $0 }),
                                   selecting: selecting, open: { id in opened.append(covers.firstIndex { $0.id == id }!) },
@@ -303,6 +313,15 @@ private struct Fixture {
         }
         let grid = try #require(findGrid(in: host))
         try await Task.sleep(for: .milliseconds(50))
+        let firstCell = try #require(grid.item(at: IndexPath(item: 0, section: 0)))
+        func menuHost(in view: NSView) -> NSView? {
+            if view.identifier?.rawValue == "CardActions" { return view }
+            return view.subviews.lazy.compactMap { menuHost(in: $0) }.first
+        }
+        let menu = try #require(menuHost(in: firstCell.view))
+        let menuPoint = menu.convert(NSPoint(x: menu.bounds.midX, y: menu.bounds.midY), to: grid.superview)
+        let menuHit = try #require(grid.hitTest(menuPoint))
+        #expect(menuHit === menu || menuHit.isDescendant(of: menu))
         let first = try #require(grid.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))).frame
         let center = NSPoint(x: first.midX, y: first.midY)
         func mouse(_ type: NSEvent.EventType, at point: NSPoint) throws {
@@ -381,6 +400,12 @@ private struct Fixture {
     defer { f.clean() }
     let details = PhotoMetadata.read(f.other)
     #expect(details.readable)
+    let location = try #require(details.location)
+    #expect(abs(location.latitude + 33.86) < 0.00001)
+    #expect(abs(location.longitude - 151.21) < 0.00001)
+    #expect(PhotoMetadata.read(f.main).location == nil)
+    #expect(PhotoLocation(gps: ["Latitude": 91, "LatitudeRef": "N", "Longitude": 100, "LongitudeRef": "W"]) == nil)
+    #expect(PhotoLocation(gps: ["Latitude": 45, "Longitude": 100, "LongitudeRef": "E"]) == nil)
     #expect(details.summary.contains { $0.label == "Dimensions" && $0.value == "80 × 120 px" })
     #expect(details.summary.contains { $0.label == "File size" })
     #expect(details.capture.contains { $0.label == "Camera" && $0.value == "Fixture camera" })
@@ -392,6 +417,54 @@ private struct Fixture {
     #expect(details.capture.contains { $0.label == "Lens" && $0.value == "XF18-55mmF2.8-4 R LM OIS" })
     #expect(details.groups.flatMap(\.fields).contains { $0.value.contains("Foothills") })
     #expect(!PhotoMetadata.read(f.root.appendingPathComponent("missing.jpg")).readable)
+}
+
+@Test func pictureMapGroupsSharedCoordinatesAndRefreshesChangedFiles() async throws {
+    let f = try Fixture()
+    defer { f.clean() }
+    let copy = f.source.appendingPathComponent("second-at-this-location.jpg")
+    try FileManager.default.copyItem(at: f.other, to: copy)
+    let photos = PhotoList([f.other, f.main, copy].map { Photo(url: $0, modified: nil) })
+    let cache = f.root.appendingPathComponent("facts.json")
+    let sorter = PhotoSorter(cacheURL: cache)
+    let all = try await sorter.mappedPictures(in: photos)
+    let location = try #require(PhotoMetadata.read(f.other).location)
+    #expect(all.count == 2)
+    #expect(all.places.count == 1)
+    #expect(all.places[location] == [photos[0], photos[2]])
+    let subset = try await PhotoSorter(cacheURL: cache).mappedPictures(in: PhotoList([photos[2]]))
+    #expect(subset.places[location] == [photos[2]])
+    try Data(contentsOf: f.main).write(to: copy)
+    try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_500_000_000)], ofItemAtPath: copy.path)
+    #expect(try await sorter.mappedPictures(in: photos).places[location] == [photos[0]])
+}
+
+@Test @MainActor func mapFitsItsPinsAndSelectingOneShowsItsPictures() async throws {
+    let f = try Fixture()
+    defer { f.clean() }
+    let first = try #require(PhotoLocation(gps: ["Latitude": 45.5, "LatitudeRef": "N", "Longitude": 73.56, "LongitudeRef": "W"]))
+    let second = try #require(PhotoLocation(gps: ["Latitude": 46.81, "LatitudeRef": "N", "Longitude": 71.21, "LongitudeRef": "W"]))
+    let frames = [Photo(url: f.main, modified: nil), Photo(url: f.other, modified: nil)]
+    let pictures = MappedPictures(places: [first: frames, second: [Photo(url: f.root.appendingPathComponent("third.jpg"), modified: nil)]], count: 3)
+    var selected: [Photo] = []
+    let host = NSHostingView(rootView: PictureLocationsMap(pictures: pictures) { selected = $0 })
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 300), styleMask: .borderless, backing: .buffered, defer: false)
+    window.contentView = host
+    window.orderFront(nil)
+    defer { window.orderOut(nil) }
+    window.layoutIfNeeded()
+    func findMap(in view: NSView) -> MKMapView? {
+        if let map = view as? MKMapView { return map }
+        return view.subviews.lazy.compactMap { findMap(in: $0) }.first
+    }
+    let map = try #require(findMap(in: host))
+    let pin = try #require(map.annotations.first { $0.coordinate.latitude == first.latitude })
+    #expect(map.visibleMapRect.contains(MKMapPoint(first.coordinate)))
+    #expect(map.visibleMapRect.contains(MKMapPoint(second.coordinate)))
+    #expect(map.region.span.longitudeDelta < 30)
+    map.selectAnnotation(pin, animated: false)
+    for _ in 0..<40 where selected.isEmpty { try await Task.sleep(for: .milliseconds(25)) }
+    #expect(selected == frames)
 }
 
 @Test @MainActor func filmstripLayoutAndSelectionNearEndOfLargeLibrary() {
@@ -781,8 +854,9 @@ private struct Fixture {
     #expect(inventory.formats == ["JPEG"])
     #expect(inventory.folders.count == 2)
     var filter = PhotoFilter()
-    #expect(try await sorter.filtered(source, by: filter, groups: groups) === source)
-    filter.folders = [folders[1].location.path]
+    #expect(try await sorter.filtered(source, by: filter) === source)
+    filter.folders = FolderFilter(includeByDefault: false)
+    filter.folders.setIncluded(true, at: folders[1].location.path)
     filter.period = .range
     filter.start = try Date("2024-03-03T00:00:00Z", strategy: .iso8601)
     filter.end = try Date("2024-03-04T00:00:00Z", strategy: .iso8601)
@@ -790,7 +864,7 @@ private struct Fixture {
     filter.camera = options.cameras[0]
     filter.lens = options.lenses[0]
     filter.filename = "PORTR"
-    let visible = try await sorter.filtered(source, by: filter, groups: groups)
+    let visible = try await sorter.filtered(source, by: filter)
     #expect(visible.map(\.id) == [f.other.standardizedFileURL.path])
     let stats = try await PictureStatistics.read(all: source, visible: visible, groups: groups)
     #expect(stats.folders[folders[0].location.path]?.total == 1)
@@ -800,11 +874,11 @@ private struct Fixture {
     #expect(stats.visibleBytes == Int64(try Data(contentsOf: f.other).count))
     #expect(stats.bytes == stats.visibleBytes + Int64(try Data(contentsOf: f.main).count))
     filter.period = .day
-    #expect(try await sorter.filtered(source, by: filter, groups: groups).isEmpty)
+    #expect(try await sorter.filtered(source, by: filter).isEmpty)
     filter.start = filter.end
-    #expect(try await sorter.filtered(source, by: filter, groups: groups).count == 1)
-    filter.folders = []
-    #expect(try await sorter.filtered(source, by: filter, groups: groups).isEmpty)
+    #expect(try await sorter.filtered(source, by: filter).count == 1)
+    filter.folders = FolderFilter(includeByDefault: false)
+    #expect(try await sorter.filtered(source, by: filter).isEmpty)
 }
 
 @Test @MainActor func mergingAndDeletingCollectionsPreserveOriginalsAndOtherMarks() throws {
@@ -818,6 +892,11 @@ private struct Fixture {
     let c = try #require(library.newCollection("C", shortcut: "c", including: f.main))
     library.togglePin(b)
     #expect(Library(saveURL: f.save).state.collectionsForDisplay.map(\.id) == [b, a, c])
+    library.setPinned(true, for: [a, b])
+    #expect(Library(saveURL: f.save).state.collections.filter(\.isPinned).map(\.id) == [a, b])
+    library.setPinned(false, for: [a, b])
+    #expect(library.state.collections.allSatisfy { !$0.isPinned })
+    library.togglePin(b)
     library.togglePin(b)
     #expect(library.state.collectionsForDisplay.map(\.id) == [a, b, c])
     library.togglePin(b)
@@ -837,6 +916,31 @@ private struct Fixture {
     restored.deleteCollections([id, c])
     #expect(Library(saveURL: f.save).state.collections.isEmpty)
     #expect(try Data(contentsOf: f.main) == original)
+}
+
+@Test func folderFilterCanIncludeOrExcludeOneBranchOfARecursiveSource() async throws {
+    let f = try Fixture()
+    defer { f.clean() }
+    let source = f.source.standardizedFileURL
+    let deep = source.appendingPathComponent("Trip/Day 1")
+    let sibling = source.appendingPathComponent("Tripod")
+    let photos = PhotoList([source, deep, sibling].map { Photo(url: $0.appendingPathComponent("frame.jpg"), modified: nil) })
+    let groups = SourceGroups([SourceFolder(location: FileReference(source))])
+    let sorter = PhotoSorter(cacheURL: nil)
+    let options = await sorter.filterOptions(in: photos, groups: groups)
+    let trip = deep.deletingLastPathComponent().path
+    #expect(Set(options.folders) == Set([source.path, trip, deep.path, sibling.path]))
+    var filter = PhotoFilter()
+    filter.folders.setIncluded(false, at: trip)
+    #expect(try await sorter.filtered(photos, by: filter).items == [photos[0], photos[2]])
+    #expect(filter.folders.hasExceptions(under: source.path))
+    filter.folders.setIncluded(true, at: deep.path)
+    #expect(try await sorter.filtered(photos, by: filter).items == photos.items)
+    filter.folders.setIncluded(true, at: source.path)
+    #expect(!filter.active)
+    filter.folders = FolderFilter(includeByDefault: false)
+    filter.folders.setIncluded(true, at: trip)
+    #expect(try await sorter.filtered(photos, by: filter).items == [photos[1]])
 }
 
 @Test @MainActor func collectionBackSwipeStopsAtTheWholeToolbar() {

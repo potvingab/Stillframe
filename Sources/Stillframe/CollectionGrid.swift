@@ -34,15 +34,18 @@ struct CollectionGrid: NSViewRepresentable {
     var accent = Palette.accent
     var selecting: Bool
     var open: (Int) -> Void
+    var pictureMenu: ((URL) -> PictureMenuItems)?
     var edit: (PhotoCollection) -> Void = { _ in }
     var togglePin: (UUID) -> Void = { _ in }
     var delete: (PhotoCollection) -> Void = { _ in }
 
-    init(items: PhotoList, selected: Binding<Set<String>>, selecting: Bool = false, accent: Color = Palette.accent, open: @escaping (URL) -> Void = { _ in }) {
+    init(items: PhotoList, selected: Binding<Set<String>>, selecting: Bool = false, accent: Color = Palette.accent,
+         menuItems: ((URL) -> PictureMenuItems)? = nil, open: @escaping (URL) -> Void = { _ in }) {
         self.items = .photos(items)
         self.selecting = selecting
         _selected = selected
         self.accent = accent
+        self.pictureMenu = menuItems
         self.open = { open(items[$0].url) }
     }
 
@@ -96,6 +99,7 @@ struct CollectionGrid: NSViewRepresentable {
         grid.selecting = selecting
         if case .photos = items { grid.exportsFiles = true } else { grid.exportsFiles = false }
         coordinator.open = open
+        coordinator.pictureMenu = pictureMenu
         coordinator.edit = edit
         coordinator.togglePin = togglePin
         coordinator.delete = delete
@@ -119,6 +123,7 @@ struct CollectionGrid: NSViewRepresentable {
         var items: Items = .photos(PhotoList([]))
         var selected: Binding<Set<String>>
         var open: (Int) -> Void = { _ in }
+        var pictureMenu: ((URL) -> PictureMenuItems)?
         var edit: (PhotoCollection) -> Void = { _ in }
         var togglePin: (UUID) -> Void = { _ in }
         var delete: (PhotoCollection) -> Void = { _ in }
@@ -139,6 +144,7 @@ struct CollectionGrid: NSViewRepresentable {
                 if let card = cell as? PictureCell {
                     card.accent = accent
                     card.activate = activate
+                    card.menuItems = pictureMenu?(photos[indexPath.item].url)
                     card.photo = photos[indexPath.item]
                 }
                 return cell
@@ -188,6 +194,7 @@ final class PictureCell: NSCollectionViewItem {
     static let identifier = NSUserInterfaceItemIdentifier("CollectionPicture")
     var accent = Palette.accent
     var activate: () -> Void = {}
+    var menuItems: PictureMenuItems?
     var photo: Photo? { didSet { updateCard() } }
     override var isSelected: Bool { didSet { if isSelected != oldValue { updateCard() } } }
 
@@ -198,7 +205,9 @@ final class PictureCell: NSCollectionViewItem {
     private func updateCard() {
         (view as? NSHostingView<PictureCard>)?.rootView = card
     }
-    private var card: PictureCard { PictureCard(photo: photo, selected: isSelected, accent: accent, activate: activate) }
+    private var card: PictureCard {
+        PictureCard(photo: photo, selected: isSelected, accent: accent, activate: activate, menuItems: menuItems)
+    }
 }
 
 private struct PictureCard: View {
@@ -206,12 +215,19 @@ private struct PictureCard: View {
     let selected: Bool
     let accent: Color
     let activate: () -> Void
+    let menuItems: PictureMenuItems?
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let photo {
                 FileImage(url: photo.url, modified: photo.modified).frame(maxWidth: .infinity, maxHeight: .infinity)
-                Text(photo.url.lastPathComponent).font(.system(size: 12, weight: .medium))
-                    .lineLimit(1).truncationMode(.middle).padding(.horizontal, 9).frame(height: 30)
+                HStack(spacing: 4) {
+                    Text(photo.url.lastPathComponent).font(.system(size: 12, weight: .medium))
+                        .lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    if let menuItems {
+                        CardMenu(title: "Picture actions") { menuItems }.frame(width: 28, height: 26)
+                    }
+                }.padding(.leading, 9).padding(.trailing, 4).frame(height: 30)
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .foregroundStyle(Palette.ink)
@@ -219,10 +235,31 @@ private struct PictureCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(selected ? accent : Palette.line, lineWidth: selected ? 3 : 1))
             .help(photo?.id ?? "")
-            .accessibilityElement(children: .combine)
+            .contentShape(Rectangle())
+            .contextMenu { menuItems }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(photo?.url.lastPathComponent ?? "")
             .accessibilityAddTraits(.isButton)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityAction { activate() }
+    }
+}
+
+// Expose the menu's bounds to AppKit so collection view selection can own the rest of the card.
+private protocol CardMenuHitTarget {}
+private final class CardMenuHost<Content: View>: NSHostingView<Content>, CardMenuHitTarget {}
+
+private struct CardMenu<Items: View>: NSViewRepresentable {
+    let title: String
+    @ViewBuilder let items: () -> Items
+
+    func makeNSView(context: Context) -> CardMenuHost<OptionsMenu<Items>> {
+        let host = CardMenuHost(rootView: OptionsMenu(title: title, items: items))
+        host.identifier = NSUserInterfaceItemIdentifier("CardActions")
+        return host
+    }
+    func updateNSView(_ view: CardMenuHost<OptionsMenu<Items>>, context: Context) {
+        view.rootView = OptionsMenu(title: title, items: items)
     }
 }
 
@@ -238,10 +275,15 @@ private final class OpenableGrid: NSCollectionView {
 
     // Hosted card views provide context menus and accessibility. The grid tracks primary clicks and drags.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        guard hit != nil else { return nil }
-        guard let event = window?.currentEvent ?? NSApp.currentEvent else { return self }
-        return event.type == .leftMouseDown && !event.modifierFlags.contains(.control) ? self : hit
+        guard let hit = super.hitTest(point) else { return nil }
+        if let event = window?.currentEvent ?? NSApp.currentEvent,
+           event.type != .leftMouseDown || event.modifierFlags.contains(.control) { return hit }
+        var ancestor: NSView? = hit
+        while let view = ancestor, view !== self {
+            if view is CardMenuHitTarget { return hit }
+            ancestor = view.superview
+        }
+        return self
     }
 
     private func itemPath(at point: NSPoint) -> IndexPath? {
@@ -385,6 +427,7 @@ private struct CollectionCover: View {
                     Spacer()
                     if collection.isPinned { Image(systemName: "pin.fill").font(.caption).accessibilityLabel("Pinned") }
                     if let shortcut = collection.shortcut { ShortcutKey(letter: shortcut) }
+                    CardMenu(title: "Collection actions") { actions(collection) }.frame(width: 28, height: 26)
                 }.padding(.horizontal, 12).frame(height: 50)
             }
             .foregroundStyle(Palette.ink)
@@ -392,27 +435,32 @@ private struct CollectionCover: View {
             .clipShape(RoundedRectangle(cornerRadius: 9))
             .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? collection.color.controlTint(in: colorScheme) : Palette.line, lineWidth: selected ? 3 : 1))
             .contentShape(Rectangle())
-            .contextMenu {
-                PinCollectionButton(collection: collection, togglePin: togglePin)
-                Button("Edit Collection…") { edit(collection) }
-                Button("Delete Collection…", role: .destructive) { delete(collection) }
-            }
-            .accessibilityElement(children: .combine)
+            .contextMenu { actions(collection) }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(collection.name)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { activate() }
             .accessibilityAddTraits(selected ? .isSelected : [])
         }
     }
+
+    private func actions(_ collection: PhotoCollection) -> CollectionMenuItems {
+        CollectionMenuItems(collection: collection, edit: edit, togglePin: togglePin, delete: delete)
+    }
 }
 
-struct PinCollectionButton: View {
+struct CollectionMenuItems: View {
     let collection: PhotoCollection
+    let edit: (PhotoCollection) -> Void
     let togglePin: (UUID) -> Void
+    let delete: (PhotoCollection) -> Void
 
     var body: some View {
         Button { togglePin(collection.id) } label: {
             Label(collection.isPinned ? "Unpin Collection" : "Pin Collection",
                   systemImage: collection.isPinned ? "pin.slash" : "pin")
         }
+        Button("Edit Collection…") { edit(collection) }
+        Button("Delete Collection…", role: .destructive) { delete(collection) }
     }
 }

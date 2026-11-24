@@ -78,16 +78,17 @@ struct PhotoOrder: Codable, Hashable {
     }
 }
 
-// Date and equipment queries share a header-only index, validated by original modification time.
+// Capture, equipment, and location queries share an index validated by original modification time.
 actor PhotoSorter {
     static let shared = PhotoSorter(cacheURL: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
-        .first?.appendingPathComponent("Stillframe/image-facts-v2.json"))
+        .first?.appendingPathComponent("Stillframe/image-facts-v3.json"))
 
     struct ImageFacts: Codable {
         let modified: Date?
         let taken: Date?
         let camera: String?
         let lens: String?
+        let location: PhotoLocation?
     }
 
     private let cacheURL: URL?
@@ -143,7 +144,8 @@ actor PhotoSorter {
             let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
             let aux = properties[kCGImagePropertyExifAuxDictionary as String] as? [String: Any]
             let info = ImageFacts(modified: modified, taken: taken, camera: tiff?["Model"] as? String,
-                                  lens: (exif?["LensModel"] as? String) ?? (aux?["LensModel"] as? String))
+                                  lens: (exif?["LensModel"] as? String) ?? (aux?["LensModel"] as? String),
+                                  location: PhotoLocation(gps: properties[kCGImagePropertyGPSDictionary as String] as? [String: Any]))
             if modified != nil {
                 dates[photo.id] = info
                 dirty = true

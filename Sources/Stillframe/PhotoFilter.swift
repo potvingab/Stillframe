@@ -2,8 +2,36 @@ import Foundation
 
 enum CapturePeriod: String, CaseIterable, Codable { case any = "Any date", day = "One day", range = "Date range" }
 
+struct FolderFilter: Equatable {
+    var includeByDefault = true
+    private(set) var overrides: [String: Bool] = [:]
+
+    var active: Bool { !includeByDefault || !overrides.isEmpty }
+
+    func includes(_ path: String) -> Bool {
+        var current = path
+        while !current.isEmpty {
+            if let rule = overrides[current] { return rule }
+            if current == "/" { break }
+            current = (current as NSString).deletingLastPathComponent
+        }
+        return includeByDefault
+    }
+
+    func hasExceptions(under path: String) -> Bool {
+        let prefix = path == "/" ? "/" : path + "/"
+        return overrides.keys.contains { $0 != path && $0.hasPrefix(prefix) }
+    }
+
+    mutating func setIncluded(_ included: Bool, at path: String) {
+        let prefix = path == "/" ? "/" : path + "/"
+        overrides = overrides.filter { $0.key != path && !$0.key.hasPrefix(prefix) }
+        if includes(path) != included { overrides[path] = included }
+    }
+}
+
 struct PhotoFilter: Equatable {
-    var folders: Set<String>? = nil
+    var folders = FolderFilter()
     var format: String?
     var camera: String?
     var lens: String?
@@ -21,7 +49,7 @@ struct PhotoFilter: Equatable {
     }
 
     var usesMetadata: Bool { period != .any || camera != nil || lens != nil }
-    var active: Bool { folders != nil || format != nil || usesMetadata || !filename.isEmpty }
+    var active: Bool { folders.active || format != nil || usesMetadata || !filename.isEmpty }
     var captureInterval: DateInterval? {
         guard period != .any else { return nil }
         var calendar = Calendar(identifier: .gregorian)
@@ -71,14 +99,20 @@ extension PhotoSorter {
         return (cameras.sorted(), lenses.sorted())
     }
 
-    func filtered(_ photos: PhotoList, by filter: PhotoFilter, groups: SourceGroups) throws -> PhotoList {
+    func filtered(_ photos: PhotoList, by filter: PhotoFilter) throws -> PhotoList {
         guard filter.active else { return photos }
         if filter.usesMetadata { loadDatesIfNeeded() }
         defer { saveDatesIfNeeded() }
         let interval = filter.captureInterval
+        var folderMatches: [String: Bool] = [:]
         let matches = try photos.filter { photo in
             try Task.checkCancellation()
-            if let folders = filter.folders, !folders.contains(groups.group(for: photo)) { return false }
+            if filter.folders.active {
+                let path = photo.url.deletingLastPathComponent().path
+                let included = folderMatches[path] ?? filter.folders.includes(path)
+                folderMatches[path] = included
+                if !included { return false }
+            }
             if let format = filter.format, PhotoFilter.format(of: photo) != format { return false }
             if !filter.filename.isEmpty, !photo.url.lastPathComponent.localizedCaseInsensitiveContains(filter.filename) { return false }
             if filter.usesMetadata {
@@ -125,12 +159,24 @@ struct PictureStatistics {
 
 extension PhotoSorter {
     func filterOptions(in photos: PhotoList, groups: SourceGroups) -> (folders: [String], formats: [String]) {
-        var folders = Set(groups.sources.map(\.location.path))
+        var directories = Set(groups.sources.map(\.location.path))
         var formats = Set<String>()
         for photo in photos {
             if Task.isCancelled { break }
-            folders.insert(groups.group(for: photo))
+            directories.insert(photo.url.deletingLastPathComponent().path)
             formats.insert(PhotoFilter.format(of: photo))
+        }
+        // Include intermediate directories only when they connect two entries in this library.
+        var folders = directories
+        for directory in directories where directory != "/" {
+            if Task.isCancelled { break }
+            var path = (directory as NSString).deletingLastPathComponent
+            var ancestors: [String] = []
+            while !path.isEmpty && path != "/" && !folders.contains(path) {
+                ancestors.append(path)
+                path = (path as NSString).deletingLastPathComponent
+            }
+            if folders.contains(path) { folders.formUnion(ancestors) }
         }
         return (folders.sorted(), formats.sorted())
     }

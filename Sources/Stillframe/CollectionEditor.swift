@@ -105,6 +105,7 @@ struct CollectionEditor: View {
     @ViewState private var name: String
     @ViewState private var color: CollectionColor
     @ViewState private var shortcut: String
+    @ViewState private var savedID: UUID?
 
     init(collection: PhotoCollection? = nil, initialColor: CollectionColor, photo: URL? = nil, merging: Set<UUID> = [], onSave: @escaping (UUID) -> Void = { _ in }) {
         self.collection = collection
@@ -117,7 +118,8 @@ struct CollectionEditor: View {
     }
 
     var body: some View {
-        let issue = library.shortcutIssue(shortcut, excluding: collection.map { [$0.id] } ?? merging)
+        let excluded = merging.union([collection?.id, savedID].compactMap { $0 })
+        let issue = library.shortcutIssue(shortcut, excluding: excluded)
         VStack(alignment: .leading, spacing: 18) {
             SectionHeading(title: !merging.isEmpty ? "Merge collections" : (collection == nil ? "New collection" : "Edit collection"))
             if !merging.isEmpty {
@@ -184,6 +186,7 @@ struct CollectionEditor: View {
     }
 
     private func save() {
+        guard savedID == nil else { return }
         let id: UUID
         if !merging.isEmpty {
             guard let merged = library.mergeCollections(merging, name: name, color: color, shortcut: shortcut) else { return }
@@ -195,6 +198,7 @@ struct CollectionEditor: View {
             guard let created = library.newCollection(name, color: color, shortcut: shortcut, including: photo) else { return }
             id = created
         }
+        savedID = id
         onSave(id)
         dismiss()
     }

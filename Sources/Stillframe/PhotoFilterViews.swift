@@ -2,17 +2,15 @@ import SwiftUI
 
 private struct FilterRequest: Equatable {
     let source: PhotoList
-    let groups: SourceGroups
     let filter: PhotoFilter
 }
 
 struct FilteredPhotos<Content: View>: View {
     let source: PhotoList
-    let groups: SourceGroups
     let filter: PhotoFilter
     @ViewBuilder let content: (PhotoList) -> Content
     @ViewState private var result: (FilterRequest, PhotoList)?
-    private var request: FilterRequest { FilterRequest(source: source, groups: groups, filter: filter) }
+    private var request: FilterRequest { FilterRequest(source: source, filter: filter) }
 
     var body: some View {
         Group {
@@ -22,7 +20,7 @@ struct FilteredPhotos<Content: View>: View {
         }.task(id: request) {
             let key = request
             guard key.filter.active else { result = nil; return }
-            if let matches = try? await PhotoSorter.shared.filtered(key.source, by: key.filter, groups: key.groups),
+            if let matches = try? await PhotoSorter.shared.filtered(key.source, by: key.filter),
                !Task.isCancelled { result = (key, matches) }
         }
     }
@@ -237,6 +235,11 @@ struct FilterButton: View {
     }
 }
 
+private struct FilterOptionsRequest: Equatable {
+    let source: PhotoList
+    let groups: SourceGroups
+}
+
 private struct FilterPanel: View {
     let source: PhotoList
     let groups: SourceGroups
@@ -274,15 +277,22 @@ private struct FilterPanel: View {
                     }
                     Divider()
                     DisclosureGroup("Folders") {
-                        VStack(alignment: .leading, spacing: 6) {
+                        LazyVStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Button("Select All") { draft.folders = FolderFilter() }
+                                Button("Deselect All") { draft.folders = FolderFilter(includeByDefault: false) }
+                            }.buttonStyle(.borderless)
                             ForEach(folders, id: \.self) { path in
-                                Toggle(isOn: Binding(get: { draft.folders?.contains(path) ?? true }, set: { included in
-                                    var set = draft.folders ?? Set(folders)
-                                    if included { set.insert(path) } else { set.remove(path) }
-                                    draft.folders = set == Set(folders) ? nil : set
-                                })) {
-                                    Text(path).lineLimit(1).truncationMode(.middle).help(path)
-                                }.toggleStyle(.checkbox)
+                                let included = draft.folders.includes(path)
+                                let mixed = draft.folders.hasExceptions(under: path)
+                                Button { draft.folders.setIncluded(mixed || !included, at: path) } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: mixed ? "minus.square.fill" : (included ? "checkmark.square.fill" : "square"))
+                                            .foregroundStyle(mixed || included ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                                        Text(path).lineLimit(1).truncationMode(.middle)
+                                    }.contentShape(Rectangle())
+                                }.buttonStyle(.plain).help(path)
+                                    .accessibilityValue(mixed ? "Partially selected" : (included ? "Selected" : "Unselected"))
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5)
                     }.disclosureGroupStyle(FullRowDisclosure())
@@ -307,7 +317,7 @@ private struct FilterPanel: View {
             .padding(16).frame(width: 340)
             .environment(\.timeZone, .gmt)
             .onChange(of: draft.start) { _, value in if draft.end < value { draft.end = value } }
-            .task(id: source) {
+            .task(id: FilterOptionsRequest(source: source, groups: groups)) {
                 let values = await PhotoSorter.shared.filterOptions(in: source, groups: groups)
                 if !Task.isCancelled { folders = values.folders; formats = values.formats }
             }

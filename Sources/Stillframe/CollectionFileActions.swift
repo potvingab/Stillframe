@@ -47,6 +47,82 @@ enum CollectionFileActions {
     }
 }
 
+extension Library {
+    func readableFiles(_ urls: [URL]) -> [URL] {
+        if let missing = urls.first(where: { !FileManager.default.isReadableFile(atPath: $0.path) }) {
+            message = "“\(missing.lastPathComponent)” is unavailable. Check its original folder."
+            return []
+        }
+        return urls
+    }
+
+    func emailPictures(_ urls: [URL]) {
+        let files = readableFiles(urls)
+        guard !files.isEmpty else { return }
+        guard let service = NSSharingService(named: .composeEmail), service.canPerform(withItems: files) else {
+            message = "Mail composition is unavailable. Check your default email app."
+            return
+        }
+        service.perform(withItems: files)
+    }
+
+    func copyPictures(_ urls: [URL], didCopy: ((String) -> Void)? = nil) {
+        guard !urls.isEmpty, !copyingPictures else { return }
+        let panel = NSOpenPanel()
+        panel.title = urls.count == 1 ? "Copy picture to a folder" : "Copy pictures to a folder"
+        panel.prompt = "Copy Here"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        copyingPictures = true
+        Task {
+            defer { copyingPictures = false }
+            do {
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try CollectionFileActions.copy(urls, to: destination)
+                }.value
+                if result.failures.isEmpty, let didCopy { didCopy(result.message) }
+                else { message = result.message }
+            } catch { message = error.localizedDescription }
+        }
+    }
+}
+
+struct PictureMenuItems: View {
+    let url: URL
+    @ObservedObject var library: Library
+    var collectionID: UUID?
+
+    var body: some View {
+        ShareLink(item: url) { Label("Share…", systemImage: "square.and.arrow.up") }
+        Button("Copy") {
+            guard !library.readableFiles([url]).isEmpty else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.writeObjects([url as NSURL])
+        }
+        Button("Copy to…") { library.copyPictures([url]) }.disabled(library.copyingPictures)
+        Button("Send by Email…") { library.emailPictures([url]) }
+        if let collectionID {
+            Divider()
+            Button("Remove from Collection") { library.unmark([url.path], in: collectionID) }
+        }
+    }
+}
+
+struct OptionsMenu<Items: View>: View {
+    let title: String
+    @ViewBuilder let items: () -> Items
+
+    var body: some View {
+        Menu(content: items) {
+            Image(systemName: "ellipsis.circle").font(.system(size: 15))
+                .frame(width: 26, height: 26).contentShape(Rectangle())
+        }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .accessibilityLabel(title).help(title)
+    }
+}
+
 struct ShareSelectionButton: NSViewRepresentable {
     let files: () -> [URL]
     @Binding var showing: Bool

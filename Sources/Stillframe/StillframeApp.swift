@@ -94,7 +94,8 @@ struct Workspace: View {
                 PicturesView(selectedPath: $selectedPath, filter: currentFilter) { sheet = .folders }
                     .transition(pageTransition(from: .leading))
             case .collections:
-                CollectionsView(openID: $collectionID, filter: currentFilter, backRequest: backRequest) { selectTab(.pictures) }
+                CollectionsView(openID: $collectionID, filter: currentFilter, backRequest: backRequest,
+                                newCollection: { sheet = .newCollection }, showPictures: { selectTab(.pictures) })
                     .transition(pageTransition(from: .trailing))
             }
         }

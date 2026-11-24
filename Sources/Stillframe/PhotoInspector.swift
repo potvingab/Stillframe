@@ -1,4 +1,5 @@
 import ImageIO
+import MapKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,11 +16,38 @@ struct MetadataGroup: Identifiable {
     var id: String { name }
 }
 
+struct PhotoLocation: Codable, Hashable {
+    let latitude: Double
+    let longitude: Double
+
+    init?(gps: [String: Any]?) {
+        func degrees(_ key: CFString, ref: CFString, positive: String, negative: String, limit: Double) -> Double? {
+            let value = gps?[key as String]
+            let number = (value as? NSNumber)?.doubleValue ?? (value as? String).flatMap(Double.init)
+            guard let number, (0...limit).contains(number),
+                  let hemisphere = (gps?[ref as String] as? String)?.uppercased() else { return nil }
+            switch hemisphere {
+            case positive: return number
+            case negative: return -number
+            default: return nil
+            }
+        }
+        guard let lat = degrees(kCGImagePropertyGPSLatitude, ref: kCGImagePropertyGPSLatitudeRef, positive: "N", negative: "S", limit: 90),
+              let lon = degrees(kCGImagePropertyGPSLongitude, ref: kCGImagePropertyGPSLongitudeRef, positive: "E", negative: "W", limit: 180)
+        else { return nil }
+        latitude = lat
+        longitude = lon
+    }
+
+    var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+}
+
 struct PhotoMetadata {
     var summary: [MetadataField] = []
     var capture: [MetadataField] = []
     var groups: [MetadataGroup] = []
     var readable = false
+    var location: PhotoLocation?
 
     static func read(_ url: URL) -> Self {
         var result = Self()
@@ -38,6 +66,7 @@ struct PhotoMetadata {
         result.readable = true
         let index = CGImageSourceGetPrimaryImageIndex(source)
         let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [String: Any] ?? [:]
+        result.location = PhotoLocation(gps: properties[kCGImagePropertyGPSDictionary as String] as? [String: Any])
         if let type = CGImageSourceGetType(source).flatMap({ UTType($0 as String) }) {
             result.summary.insert(.init("Format", type.localizedDescription ?? type.identifier), at: 0)
         }
@@ -128,6 +157,7 @@ struct PhotoMetadata {
 }
 
 struct PhotoInspector: View {
+    @EnvironmentObject private var library: Library
     let photo: Photo
     let active: Bool
     @ViewState private var loadedPhoto: Photo?
@@ -145,6 +175,10 @@ struct PhotoInspector: View {
                 Divider()
                 if loadedPhoto == photo, let metadata {
                     rows(metadata.summary)
+                    if let location = metadata.location {
+                        Divider()
+                        locationSection(location)
+                    }
                     if !metadata.capture.isEmpty {
                         Divider()
                         Text("Capture").font(.headline)
@@ -179,6 +213,31 @@ struct PhotoInspector: View {
             ForEach(fields) { item in
                 field(item.label, item.value)
             }
+        }
+    }
+
+    private func locationSection(_ location: PhotoLocation) -> some View {
+        let region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 1800, longitudinalMeters: 1800)
+        let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...5))
+        return VStack(alignment: .leading, spacing: 7) {
+            Text("Location").font(.headline)
+            Map(initialPosition: .region(region), interactionModes: []) {
+                Marker("Photo location", coordinate: location.coordinate)
+            }.id(location).frame(height: 112).clipShape(RoundedRectangle(cornerRadius: 6))
+            Text("\(location.latitude.formatted(format)), \(location.longitude.formatted(format))")
+                .font(.caption).monospacedDigit().textSelection(.enabled)
+            Button {
+                let item: MKMapItem
+                if #available(macOS 26, *) {
+                    item = MKMapItem(location: CLLocation(latitude: location.latitude, longitude: location.longitude), address: nil)
+                } else {
+                    item = MKMapItem(placemark: MKPlacemark(coordinate: location.coordinate))
+                }
+                item.name = photo.url.lastPathComponent
+                if !item.openInMaps(launchOptions: nil) { library.message = "Apple Maps could not open this location." }
+            } label: {
+                Label("Open in Apple Maps", systemImage: "map")
+            }.buttonStyle(.link).font(.callout)
         }
     }
 

@@ -7,6 +7,7 @@ struct CollectionsView: View {
     @Binding var openID: UUID?
     @Binding var filter: PhotoFilter
     var backRequest: Int
+    var newCollection: () -> Void
     var showPictures: () -> Void
     @ViewState private var editing: PhotoCollection?
     @ViewState private var deleteIDs: Set<UUID> = []
@@ -18,7 +19,6 @@ struct CollectionsView: View {
     @ViewState private var selectingPhotos = false
     @ViewState private var previewPath: String?
     @ViewState private var sharing = false
-    @ViewState private var copying = false
     @ViewState private var copyNotice: String?
 
     var body: some View {
@@ -26,7 +26,7 @@ struct CollectionsView: View {
             if let collection = library.state.collections.first(where: { $0.id == openID }) {
                 let all = library.photos(in: collection)
                 let accent = collection.color.controlTint(in: colorScheme)
-                FilteredPhotos(source: all, groups: SourceGroups([]), filter: filter) { visible in
+                FilteredPhotos(source: all, filter: filter) { visible in
                     detail(collection, all: all, visible: visible, accent: accent)
                         .tint(accent)
                         .environment(\.collectionAccent, collection.color)
@@ -42,7 +42,8 @@ struct CollectionsView: View {
             }
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.26), value: openID)
-        .padding(.horizontal, 10).padding(.top, 5)
+        .padding(.horizontal, library.state.collections.isEmpty ? 0 : 10)
+        .padding(.top, library.state.collections.isEmpty ? 0 : 5)
         .onChange(of: openID) { _, _ in
             selectingCollections = false
             choices.removeAll()
@@ -60,7 +61,9 @@ struct CollectionsView: View {
         .onChange(of: selectingPhotos) { _, active in
             if !active { selected.removeAll() }
         }
-        .onChange(of: backRequest) { _, _ in if openID != nil { goBack() } }
+        .onChange(of: backRequest) { _, _ in
+            if openID != nil && previewPath == nil { goBack() }
+        }
         .onChange(of: selected) { _, paths in
             if !paths.isEmpty { selectingPhotos = true }
             copyNotice = nil
@@ -100,9 +103,12 @@ struct CollectionsView: View {
                     .font(.system(size: 20, weight: .medium, design: .serif)).foregroundStyle(Palette.ink)
             }
             if library.state.collections.isEmpty {
-                EmptyPanel(title: "Your first collection", detail: "Choose New Collection, then mark photos in Pictures.") {
-                    EmptyGlyph(symbol: "rectangle.stack")
-                } actions: { EmptyView() }
+                EmptyPanel(title: "Create your first collection", detail: "Gather pictures from any folder into a collection.") {
+                    EmptyGlyph(symbol: "rectangle.stack").scaleEffect(1.2).frame(height: 104)
+                } actions: {
+                    Button(action: newCollection) { Label("Create Collection…", systemImage: "plus") }
+                        .buttonStyle(ActionStyle(primary: true))
+                }
             } else {
                 CollectionGrid(collections: library.state.collectionsForDisplay, choices: $choices, selecting: selectingCollections,
                                open: { openID = $0 }, edit: { editing = $0 }, togglePin: library.togglePin,
@@ -114,6 +120,10 @@ struct CollectionsView: View {
                     SelectionActions(allSelected: choices.count == library.state.collections.count, selectAll: {
                         choices = Set(library.state.collections.map(\.id))
                     }, hasSelection: !choices.isEmpty, selectionMode: $selectingCollections) {
+                        let pin = library.state.collections.contains { choices.contains($0.id) && !$0.isPinned }
+                        Button { library.setPinned(pin, for: choices) } label: {
+                            Label(pin ? "Pin" : "Unpin", systemImage: pin ? "pin" : "pin.slash").modifier(SelectionControl())
+                        }
                         Button { merging = true } label: {
                             Label("Merge…", systemImage: "rectangle.stack").modifier(SelectionControl())
                         }.disabled(choices.count < 2)
@@ -132,12 +142,6 @@ struct CollectionsView: View {
         confirmingDelete = true
     }
 
-    @ViewBuilder private func menuItems(_ collection: PhotoCollection) -> some View {
-        PinCollectionButton(collection: collection, togglePin: library.togglePin)
-        Button("Edit Collection…") { editing = collection }
-        Button("Delete Collection…", role: .destructive) { confirmDeletion([collection.id]) }
-    }
-
     private func detail(_ collection: PhotoCollection, all: PhotoList, visible: PhotoList, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             Button(action: goBack) {
@@ -149,8 +153,10 @@ struct CollectionsView: View {
                 SectionHeading(title: collection.name).help(collection.name)
                 if let key = collection.shortcut { ShortcutKey(letter: key) }
                 Spacer()
-                Menu { menuItems(collection) } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton).fixedSize().help("Collection options").accessibilityLabel("Collection options")
+                OptionsMenu(title: "Collection actions") {
+                    CollectionMenuItems(collection: collection, edit: { editing = $0 }, togglePin: library.togglePin,
+                                        delete: { confirmDeletion([$0.id]) })
+                }
             }
             if collection.items.isEmpty {
                 EmptyPanel(title: "No pictures marked yet", detail: "Open Pictures and use Add to Collection to mark a photo.") {
@@ -165,10 +171,11 @@ struct CollectionsView: View {
                 SortedPhotos(source: visible, sourceOrder: .collection, order: collection.sort) { photos in
                     ZStack {
                         if previewPath != nil {
-                            PhotoCarousel(photos: photos, selectedPath: $previewPath, all: all, accent: accent)
+                            PhotoCarousel(photos: photos, selectedPath: $previewPath, all: all, accent: accent, collectionID: collection.id)
                                 .transition(reduceMotion ? .identity : .opacity.combined(with: .scale(scale: 0.985)))
                         } else {
-                            CollectionGrid(items: photos, selected: $selected, selecting: selectingPhotos, accent: accent) { url in
+                            CollectionGrid(items: photos, selected: $selected, selecting: selectingPhotos, accent: accent,
+                                           menuItems: { PictureMenuItems(url: $0, library: library, collectionID: collection.id) }) { url in
                                 withAnimation(reduceMotion ? nil : .smooth(duration: 0.23)) { previewPath = url.path }
                             }
                             .padding(.horizontal, -24)
@@ -176,6 +183,7 @@ struct CollectionsView: View {
                             .transition(reduceMotion ? .identity : .opacity)
                         }
                     }
+                    .modifier(PictureMapAccess(photos: photos, open: { previewPath = $0.id }))
                 }
             }
             if !collection.items.isEmpty && previewPath == nil {
@@ -186,7 +194,7 @@ struct CollectionsView: View {
                         Text("\(selected.count) selected").foregroundStyle(accent)
                     }
                     Spacer()
-                    if copying { ProgressView().controlSize(.small).accessibilityLabel("Copying pictures") }
+                    if library.copyingPictures { ProgressView().controlSize(.small).accessibilityLabel("Copying pictures") }
                     if let copyNotice { Text(copyNotice).lineLimit(1) }
                     selectionActions(in: collection, visible: visible)
                 }.font(.callout).monospacedDigit().foregroundStyle(Palette.secondary)
@@ -211,16 +219,19 @@ struct CollectionsView: View {
         SelectionActions(allSelected: selected.count == visible.count, selectAll: {
             selected = Set(visible.map(\.id))
         }, hasSelection: !selected.isEmpty, selectionMode: $selectingPhotos) {
-            ShareSelectionButton(files: { readableSelection(in: collection) }, showing: $sharing)
+            ShareSelectionButton(files: { library.readableFiles(selectedURLs(in: collection)) }, showing: $sharing)
                 .fixedSize()
             Button {
-                copySelection(in: collection)
+                copyNotice = nil
+                library.copyPictures(selectedURLs(in: collection)) { message in
+                    if openID == collection.id { copyNotice = message }
+                }
             } label: {
                 Label("Copy to…", systemImage: "folder").modifier(SelectionControl())
-            }.disabled(copying)
+            }.disabled(library.copyingPictures)
             Divider().frame(height: 14).accessibilityHidden(true)
             Menu {
-                Button("Send by Email…") { emailSelection(in: collection) }
+                Button("Send by Email…") { library.emailPictures(selectedURLs(in: collection)) }
                 Divider()
                 Button("Remove from Collection") {
                     library.unmark(selected, in: collection.id)
@@ -237,50 +248,6 @@ struct CollectionsView: View {
     private func selectedURLs(in collection: PhotoCollection) -> [URL] {
         collection.items.compactMap { selected.contains($0.path) ? $0.url : nil }
     }
-
-    private func readableSelection(in collection: PhotoCollection) -> [URL] {
-        let urls = selectedURLs(in: collection)
-        if let missing = urls.first(where: { !FileManager.default.isReadableFile(atPath: $0.path) }) {
-            library.message = "“\(missing.lastPathComponent)” is unavailable. Check its original folder."
-            return []
-        }
-        return urls
-    }
-
-    private func emailSelection(in collection: PhotoCollection) {
-        let urls = readableSelection(in: collection)
-        guard !urls.isEmpty else { return }
-        guard let service = NSSharingService(named: .composeEmail), service.canPerform(withItems: urls) else {
-            library.message = "Mail composition is unavailable. Check your default email app."
-            return
-        }
-        service.perform(withItems: urls)
-    }
-
-    private func copySelection(in collection: PhotoCollection) {
-        let urls = selectedURLs(in: collection)
-        guard !urls.isEmpty, !copying else { return }
-        let panel = NSOpenPanel()
-        panel.title = "Copy selected pictures to a folder"
-        panel.prompt = "Copy Here"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-        copying = true
-        copyNotice = nil
-        Task {
-            defer { copying = false }
-            do {
-                let result = try await Task.detached(priority: .userInitiated) {
-                    try CollectionFileActions.copy(urls, to: destination)
-                }.value
-                if !result.failures.isEmpty { library.message = result.message }
-                else if openID == collection.id { copyNotice = result.message }
-            } catch { library.message = error.localizedDescription }
-        }
-    }
-
 }
 
 private struct SelectionActions<Actions: View>: View {
