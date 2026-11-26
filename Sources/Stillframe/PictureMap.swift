@@ -29,8 +29,9 @@ struct PictureMapAccess: ViewModifier {
 
     func body(content: Content) -> some View {
         content.toolbar {
-            ToolbarItem(id: "picture-map", placement: .primaryAction) {
-                HeaderAction(title: "Map", symbol: "map") { showing = true }
+            ToolbarItem(id: "picture-map", placement: .navigation) {
+                HeaderAction(title: "Maps", symbol: "map") { showing = true }
+                    .padding(.horizontal, 8)
                     .help("Show these pictures on a map")
             }.withoutSharedGlass()
         }.sheet(isPresented: $showing) {

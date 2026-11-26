@@ -250,6 +250,7 @@ private struct FilterPanel: View {
     @ViewState private var formats: [String] = []
     @ViewState private var equipment: (source: PhotoList, cameras: [String], lenses: [String])?
     @ViewState private var showEquipment: Bool
+    @ViewState private var choosingLocation = false
 
     init(source: PhotoList, groups: SourceGroups, current: PhotoFilter, apply: @escaping (PhotoFilter) -> Void) {
         self.source = source
@@ -260,6 +261,15 @@ private struct FilterPanel: View {
     }
 
     var body: some View {
+        if choosingLocation {
+            LocationFilterEditor(initial: draft.location, cancel: { choosingLocation = false }) { location in
+                draft.location = location
+                choosingLocation = false
+            }
+        } else { filterForm }
+    }
+
+    private var filterForm: some View {
         VStack(alignment: .leading, spacing: 13) {
             Text("Filter pictures").font(.system(size: 12, weight: .semibold))
             ScrollView {
@@ -276,6 +286,17 @@ private struct FilterPanel: View {
                         }
                     }
                     Divider()
+                    HStack(spacing: 6) {
+                        Text("Location")
+                        Spacer()
+                        Button(draft.location?.label ?? "Choose area…") { choosingLocation = true }
+                            .lineLimit(1).truncationMode(.middle)
+                            .help(draft.location?.label ?? "Choose a center and radius")
+                        if draft.location != nil {
+                            Button { draft.location = nil } label: { Image(systemName: "xmark.circle.fill") }
+                                .buttonStyle(.plain).accessibilityLabel("Clear location filter")
+                        }
+                    }
                     DisclosureGroup("Folders") {
                         LazyVStack(alignment: .leading, spacing: 6) {
                             HStack {

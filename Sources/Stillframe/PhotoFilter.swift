@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 
 enum CapturePeriod: String, CaseIterable, Codable { case any = "Any date", day = "One day", range = "Date range" }
 
@@ -30,11 +31,28 @@ struct FolderFilter: Equatable {
     }
 }
 
+struct LocationFilter: Equatable {
+    let center: PhotoLocation
+    let name: String?
+    var radiusKm: Int
+
+    var meters: Double { Double(radiusKm) * 1000 }
+    var label: String { "\(radiusKm) km from \(name ?? center.coordinateText)" }
+
+    func contains(_ location: PhotoLocation?) -> Bool {
+        guard let location else { return false }
+        let origin = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        let point = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        return point.distance(from: origin) <= meters
+    }
+}
+
 struct PhotoFilter: Equatable {
     var folders = FolderFilter()
     var format: String?
     var camera: String?
     var lens: String?
+    var location: LocationFilter?
     var filename = ""
     var period: CapturePeriod = .any
     var start = Self.cameraToday
@@ -48,7 +66,7 @@ struct PhotoFilter: Equatable {
         return calendar.date(from: components)!
     }
 
-    var usesMetadata: Bool { period != .any || camera != nil || lens != nil }
+    var usesMetadata: Bool { period != .any || camera != nil || lens != nil || location != nil }
     var active: Bool { folders.active || format != nil || usesMetadata || !filename.isEmpty }
     var captureInterval: DateInterval? {
         guard period != .any else { return nil }
@@ -117,6 +135,7 @@ extension PhotoSorter {
             if !filter.filename.isEmpty, !photo.url.lastPathComponent.localizedCaseInsensitiveContains(filter.filename) { return false }
             if filter.usesMetadata {
                 let metadata = facts(of: photo)
+                if let area = filter.location, !area.contains(metadata?.location) { return false }
                 if let camera = filter.camera, metadata?.camera != camera { return false }
                 if let lens = filter.lens, metadata?.lens != lens { return false }
                 if let interval {

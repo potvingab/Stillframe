@@ -59,7 +59,9 @@ Assign **P** to *Print Shortlist* and mark candidates as you browse. Open the co
 
 ### Folders, filters, and sorting
 
-Choose **Map** in Pictures or an open collection to see the locations of the pictures matching your filters. Select a pin to see the pictures taken there, then click a thumbnail to open it. Nearby pins group together as you zoom out.
+Choose **Maps** at the top left of Pictures or an open collection to see the locations of the pictures matching your filters. Select a pin to see the pictures taken there, then click a thumbnail to open it. Nearby pins group together as you zoom out.
+
+To find pictures near a place, open **Filter → Location → Choose area…**. Search for a place or address, enter decimal coordinates, or click the map to set the center. Choose a radius, click **Use Location**, then **Apply**. The results include geotagged pictures within that distance that also match your other filters.
 
 - **Folders and workspaces.** Press **⌘O** to add folders and **⌘R** to refresh them. Use **Folders → Workspaces** to create, duplicate, rename, or delete project folder lists. Switch lists there or with the arrow beside **Folders**. All workspaces share your collections.
 - **Filter.** Combine source folders, part of a filename, file format, capture day or date range, camera, and lens. The folder filter lists subfolders found by recursive scans. Choose **Deselect All**, then check a folder to see just that branch. Each workspace and collection remembers its filters for the session.

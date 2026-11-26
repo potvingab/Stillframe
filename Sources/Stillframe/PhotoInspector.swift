@@ -20,6 +20,12 @@ struct PhotoLocation: Codable, Hashable {
     let latitude: Double
     let longitude: Double
 
+    init?(coordinate: CLLocationCoordinate2D) {
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        latitude = coordinate.latitude
+        longitude = coordinate.longitude
+    }
+
     init?(gps: [String: Any]?) {
         func degrees(_ key: CFString, ref: CFString, positive: String, negative: String, limit: Double) -> Double? {
             let value = gps?[key as String]
@@ -40,6 +46,11 @@ struct PhotoLocation: Codable, Hashable {
     }
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
+
+    var coordinateText: String {
+        let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...5))
+        return "\(latitude.formatted(format)), \(longitude.formatted(format))"
+    }
 }
 
 struct PhotoMetadata {
@@ -175,14 +186,14 @@ struct PhotoInspector: View {
                 Divider()
                 if loadedPhoto == photo, let metadata {
                     rows(metadata.summary)
-                    if let location = metadata.location {
-                        Divider()
-                        locationSection(location)
-                    }
                     if !metadata.capture.isEmpty {
                         Divider()
                         Text("Capture").font(.headline)
                         rows(metadata.capture)
+                    }
+                    if let location = metadata.location {
+                        Divider()
+                        locationSection(location)
                     }
                     if !metadata.groups.isEmpty {
                         Divider()
@@ -218,13 +229,12 @@ struct PhotoInspector: View {
 
     private func locationSection(_ location: PhotoLocation) -> some View {
         let region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 1800, longitudinalMeters: 1800)
-        let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...5))
         return VStack(alignment: .leading, spacing: 7) {
             Text("Location").font(.headline)
             Map(initialPosition: .region(region), interactionModes: []) {
                 Marker("Photo location", coordinate: location.coordinate)
             }.id(location).frame(height: 112).clipShape(RoundedRectangle(cornerRadius: 6))
-            Text("\(location.latitude.formatted(format)), \(location.longitude.formatted(format))")
+            Text(location.coordinateText)
                 .font(.caption).monospacedDigit().textSelection(.enabled)
             Button {
                 let item: MKMapItem

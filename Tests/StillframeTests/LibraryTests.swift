@@ -280,87 +280,113 @@ private struct Fixture {
     #expect(grid.draggingSession(session, sourceOperationMaskFor: .withinApplication) == .copy)
 }
 
-@Test @MainActor func filledGridsOpenOnClickAndSelectFromEitherEdge() async throws {
-    let f = try Fixture()
-    defer { f.clean() }
-    let covers = (0..<30).map { PhotoCollection(name: "Collection \($0)") }
-    let photos = PhotoList(covers.map { Photo(url: f.root.appendingPathComponent($0.name), modified: nil) })
-    let library = Library(saveURL: f.save)
-    for testingPhotos in [false, true] {
-        var selectedPhotos: Set<String> = []
-        var selectedCovers: Set<UUID> = []
-        var opened: [Int] = []
-        func content(selecting: Bool) -> CollectionGrid {
-            if testingPhotos {
-                return CollectionGrid(items: photos, selected: Binding(get: { selectedPhotos }, set: { selectedPhotos = $0 }),
-                                      selecting: selecting, menuItems: { PictureMenuItems(url: $0, library: library, collectionID: covers[0].id) },
-                                      open: { url in opened.append(photos.position(of: url.path)!) })
+// These tests dispatch mouse events in the same AppKit application.
+@Suite(.serialized) @MainActor struct MouseInteractionTests {
+    @Test func filledGridsOpenOnClickAndSelectFromEitherEdge() async throws {
+        let f = try Fixture()
+        defer { f.clean() }
+        let covers = (0..<30).map { PhotoCollection(name: "Collection \($0)") }
+        let photos = PhotoList(covers.map { Photo(url: f.root.appendingPathComponent($0.name), modified: nil) })
+        let library = Library(saveURL: f.save)
+        for testingPhotos in [false, true] {
+            var selectedPhotos: Set<String> = []
+            var selectedCovers: Set<UUID> = []
+            var opened: [Int] = []
+            func content(selecting: Bool) -> CollectionGrid {
+                if testingPhotos {
+                    return CollectionGrid(items: photos, selected: Binding(get: { selectedPhotos }, set: { selectedPhotos = $0 }),
+                                          selecting: selecting, menuItems: { PictureMenuItems(url: $0, library: library, collectionID: covers[0].id) },
+                                          open: { url in opened.append(photos.position(of: url.path)!) })
+                }
+                return CollectionGrid(collections: covers, choices: Binding(get: { selectedCovers }, set: { selectedCovers = $0 }),
+                                      selecting: selecting, open: { id in opened.append(covers.firstIndex { $0.id == id }!) },
+                                      edit: { _ in }, togglePin: { _ in }, delete: { _ in })
             }
-            return CollectionGrid(collections: covers, choices: Binding(get: { selectedCovers }, set: { selectedCovers = $0 }),
-                                  selecting: selecting, open: { id in opened.append(covers.firstIndex { $0.id == id }!) },
-                                  edit: { _ in }, togglePin: { _ in }, delete: { _ in })
+            let host = NSHostingView(rootView: content(selecting: false))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 340),
+                                  styleMask: .titled, backing: .buffered, defer: false)
+            window.contentView = host
+            window.makeKeyAndOrderFront(nil)
+            defer { window.orderOut(nil) }
+            window.layoutIfNeeded()
+            func findGrid(in view: NSView) -> NSCollectionView? {
+                if let grid = view as? NSCollectionView { return grid }
+                return view.subviews.lazy.compactMap { findGrid(in: $0) }.first
+            }
+            let grid = try #require(findGrid(in: host))
+            try await Task.sleep(for: .milliseconds(50))
+            let firstCell = try #require(grid.item(at: IndexPath(item: 0, section: 0)))
+            func menuHost(in view: NSView) -> NSView? {
+                if view.identifier?.rawValue == "CardActions" { return view }
+                return view.subviews.lazy.compactMap { menuHost(in: $0) }.first
+            }
+            let menu = try #require(menuHost(in: firstCell.view))
+            let menuPoint = menu.convert(NSPoint(x: menu.bounds.midX, y: menu.bounds.midY), to: grid.superview)
+            let menuHit = try #require(grid.hitTest(menuPoint))
+            #expect(menuHit === menu || menuHit.isDescendant(of: menu))
+            let first = try #require(grid.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))).frame
+            let center = NSPoint(x: first.midX, y: first.midY)
+            func mouse(_ type: NSEvent.EventType, at point: NSPoint) throws {
+                let event = try #require(NSEvent.mouseEvent(with: type, location: grid.convert(point, to: nil),
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                NSApplication.shared.sendEvent(event)
+            }
+            func click() throws {
+                try mouse(.leftMouseDown, at: center)
+                try mouse(.leftMouseUp, at: center)
+            }
+            try click()
+            #expect(opened == [0])
+            #expect(grid.selectionIndexPaths.isEmpty)
+            host.rootView = content(selecting: true)
+            window.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(30))
+            try click()
+            #expect(grid.selectionIndexPaths == [IndexPath(item: 0, section: 0)])
+            try click()
+            #expect(grid.selectionIndexPaths.isEmpty)
+            host.rootView = content(selecting: false)
+            window.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(30))
+            let left = NSPoint(x: 18, y: first.midY), right = NSPoint(x: grid.visibleRect.maxX - 18, y: first.midY)
+            #expect(grid.indexPathForItem(at: left) == nil && grid.indexPathForItem(at: right) == nil)
+            #expect(grid.frame.height > grid.visibleRect.height)
+            for (start, end) in [(left, right), (right, left), (center, right)] {
+                try mouse(.leftMouseDown, at: start)
+                try mouse(.leftMouseDragged, at: end)
+                try mouse(.leftMouseUp, at: end)
+                #expect(grid.selectionIndexPaths.count > 1)
+                #expect(testingPhotos ? selectedPhotos.count > 1 : selectedCovers.count > 1)
+                #expect(opened == [0])
+                try mouse(.leftMouseDown, at: left)
+                try mouse(.leftMouseUp, at: left)
+                #expect(grid.selectionIndexPaths.isEmpty)
+            }
         }
-        let host = NSHostingView(rootView: content(selecting: false))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 340),
-                              styleMask: .titled, backing: .buffered, defer: false)
+    }
+
+    @Test func clickingTheLocationFilterMapPlacesTheRadiusAtTheClick() async throws {
+        let host = NSHostingView(rootView: LocationFilterEditor(initial: nil, cancel: {}, use: { _ in }))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 340), styleMask: .borderless,
+                              backing: .buffered, defer: false)
         window.contentView = host
-        window.makeKeyAndOrderFront(nil)
+        window.orderBack(nil)
         defer { window.orderOut(nil) }
         window.layoutIfNeeded()
-        func findGrid(in view: NSView) -> NSCollectionView? {
-            if let grid = view as? NSCollectionView { return grid }
-            return view.subviews.lazy.compactMap { findGrid(in: $0) }.first
-        }
-        let grid = try #require(findGrid(in: host))
-        try await Task.sleep(for: .milliseconds(50))
-        let firstCell = try #require(grid.item(at: IndexPath(item: 0, section: 0)))
-        func menuHost(in view: NSView) -> NSView? {
-            if view.identifier?.rawValue == "CardActions" { return view }
-            return view.subviews.lazy.compactMap { menuHost(in: $0) }.first
-        }
-        let menu = try #require(menuHost(in: firstCell.view))
-        let menuPoint = menu.convert(NSPoint(x: menu.bounds.midX, y: menu.bounds.midY), to: grid.superview)
-        let menuHit = try #require(grid.hitTest(menuPoint))
-        #expect(menuHit === menu || menuHit.isDescendant(of: menu))
-        let first = try #require(grid.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))).frame
-        let center = NSPoint(x: first.midX, y: first.midY)
-        func mouse(_ type: NSEvent.EventType, at point: NSPoint) throws {
-            let event = try #require(NSEvent.mouseEvent(with: type, location: grid.convert(point, to: nil),
-                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+        let map = try #require(findMap(in: host))
+        let point = NSPoint(x: map.bounds.midX - 12, y: map.bounds.midY + 8)
+        let expected = map.convert(point, toCoordinateFrom: map)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: map.convert(point, to: nil), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
                 context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
-            NSApplication.shared.sendEvent(event)
+            window.sendEvent(event)
         }
-        func click() throws {
-            try mouse(.leftMouseDown, at: center)
-            try mouse(.leftMouseUp, at: center)
-        }
-        try click()
-        #expect(opened == [0])
-        #expect(grid.selectionIndexPaths.isEmpty)
-        host.rootView = content(selecting: true)
-        window.layoutIfNeeded()
-        try await Task.sleep(for: .milliseconds(30))
-        try click()
-        #expect(grid.selectionIndexPaths == [IndexPath(item: 0, section: 0)])
-        try click()
-        #expect(grid.selectionIndexPaths.isEmpty)
-        host.rootView = content(selecting: false)
-        window.layoutIfNeeded()
-        try await Task.sleep(for: .milliseconds(30))
-        let left = NSPoint(x: 18, y: first.midY), right = NSPoint(x: grid.visibleRect.maxX - 18, y: first.midY)
-        #expect(grid.indexPathForItem(at: left) == nil && grid.indexPathForItem(at: right) == nil)
-        #expect(grid.frame.height > grid.visibleRect.height)
-        for (start, end) in [(left, right), (right, left), (center, right)] {
-            try mouse(.leftMouseDown, at: start)
-            try mouse(.leftMouseDragged, at: end)
-            try mouse(.leftMouseUp, at: end)
-            #expect(grid.selectionIndexPaths.count > 1)
-            #expect(testingPhotos ? selectedPhotos.count > 1 : selectedCovers.count > 1)
-            #expect(opened == [0])
-            try mouse(.leftMouseDown, at: left)
-            try mouse(.leftMouseUp, at: left)
-            #expect(grid.selectionIndexPaths.isEmpty)
-        }
+        for _ in 0..<40 where map.overlays.isEmpty { try await Task.sleep(for: .milliseconds(25)) }
+        let area = try #require(map.overlays.first)
+        #expect(abs(area.coordinate.latitude - expected.latitude) < 0.01)
+        #expect(abs(area.coordinate.longitude - expected.longitude) < 0.01)
     }
 }
 
@@ -439,6 +465,11 @@ private struct Fixture {
     #expect(try await sorter.mappedPictures(in: photos).places[location] == [photos[0]])
 }
 
+@MainActor private func findMap(in view: NSView) -> MKMapView? {
+    if let map = view as? MKMapView { return map }
+    return view.subviews.lazy.compactMap { findMap(in: $0) }.first
+}
+
 @Test @MainActor func mapFitsItsPinsAndSelectingOneShowsItsPictures() async throws {
     let f = try Fixture()
     defer { f.clean() }
@@ -453,10 +484,6 @@ private struct Fixture {
     window.orderFront(nil)
     defer { window.orderOut(nil) }
     window.layoutIfNeeded()
-    func findMap(in view: NSView) -> MKMapView? {
-        if let map = view as? MKMapView { return map }
-        return view.subviews.lazy.compactMap { findMap(in: $0) }.first
-    }
     let map = try #require(findMap(in: host))
     let pin = try #require(map.annotations.first { $0.coordinate.latitude == first.latitude })
     #expect(map.visibleMapRect.contains(MKMapPoint(first.coordinate)))
@@ -838,6 +865,33 @@ private struct Fixture {
     #expect(library.photos.count == 1)
     #expect(library.markRevision == marks)
     #expect(library.collections(containing: f.main.standardizedFileURL.path).map(\.id) == [collection])
+}
+
+@Test func radiusFilterMatchesGeotaggedPicturesAlongsideOtherCriteria() async throws {
+    let f = try Fixture()
+    defer { f.clean() }
+    let photos = PhotoList([f.main, f.other].map { Photo(url: $0, modified: nil) })
+    let sorter = PhotoSorter(cacheURL: nil)
+    let center = try #require(PhotoLocation(coordinate: .init(latitude: -33.96, longitude: 151.21)))
+    var filter = PhotoFilter()
+    filter.location = LocationFilter(center: center, name: "Sydney", radiusKm: 10)
+    #expect(filter.active && filter.usesMetadata)
+    #expect(try await sorter.filtered(photos, by: filter).isEmpty)
+    filter.location?.radiusKm = 25
+    #expect(try await sorter.filtered(photos, by: filter).items == [photos[1]])
+    filter.filename = "picture"
+    #expect(try await sorter.filtered(photos, by: filter).isEmpty)
+    filter.location = nil
+    #expect(try await sorter.filtered(photos, by: filter).items == [photos[0]])
+}
+
+@Test func radiusFilterCrossesTheDateLine() throws {
+    let center = try #require(PhotoLocation(coordinate: .init(latitude: 0, longitude: 179.99)))
+    let point = try #require(PhotoLocation(coordinate: .init(latitude: 0, longitude: -179.99)))
+    let area = LocationFilter(center: center, name: nil, radiusKm: 5)
+    #expect(area.contains(point))
+    #expect(!area.contains(nil))
+    #expect(PhotoLocation(coordinate: .init(latitude: 91, longitude: 0)) == nil)
 }
 
 @Test func filtersMatchCameraDaysAndReportDistinctRootTotals() async throws {
